@@ -1,0 +1,13 @@
+TODOs [PoC]:
+- [🔃] Define nodes (BankA, BankB, BankC, Notary, Observer) 
+- [🔃] Implement state (UniqueIdentifier, Party Issuer, Party Owner, Amount, Contract ID ?)
+- Implement contract
+- Implement flow with subflow into observer node
+- Implement constract constraint (target: a party bank for AML)
+
+# Integration
+- Expose and checking data inside observer node
+- Add build config with dockerform
+
+# Documentation
+- Create diagram end-to-end flow inside DLT
