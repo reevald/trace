@@ -24,7 +24,7 @@ Key Components:
 
 - Notary: A network service that prevents "double-spending" by ensuring each transaction is unique before it is recorded.
 
-- KDR (Kustodian Depositori Rupiah): A central registry node that acts as a source of truth for the total amount of assets in circulation.
+- KDR (Khazanah Digital Rupiah): A central registry node that acts as a source of truth for the total amount of assets in circulation.
 
 - Observer: A regulatory node that silently receives a copy of every transaction on the network for compliance and monitoring purposes. This is the primary data source for TRACE.
 
