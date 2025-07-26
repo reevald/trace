@@ -1,142 +1,507 @@
-<p align="center">
-  <img src="https://www.corda.net/wp-content/uploads/2016/11/fg005_corda_b.png" alt="Corda" width="500">
-</p>
+# Digital Rupiah Trace (DLT) System
 
-# CorDapp Template - Java [<img src="https://raw.githubusercontent.com/corda/samples-java/master/webIDE.png" height=25 />](https://ide.corda.net/?folder=/home/coder/cordapp-template-java)
+A Corda-based implementation of Indonesia's Central Bank Digital Currency (CBDC) system with comprehensive wallet management and traceability.
 
-Welcome to the Java CorDapp template. The CorDapp template is a stubbed-out CorDapp that you can use to bootstrap 
-your own CorDapps.
+## System Overview
 
-**This is the Java version of the CorDapp template. The Kotlin equivalent is 
-[here](https://github.com/corda/cordapp-template-kotlin/).**
+The DLT system implements a hierarchical digital currency structure:
+- **wRD (Wholesale Digital Rupiah)** - For banks and financial institutions
+- **rRD (Retail Digital Rupiah)** - For end users (Peritel and Retail)
 
-# Pre-Requisites
+### Network Participants
+- **KDR (Bank Indonesia)** - Central bank issuing authority (Port 10006)
+- **Wholesaler1** - Commercial bank (Port 10009)
+- **Wholesaler2** - Commercial bank (Port 10012)
+- **Wholesaler3** - Commercial bank (Port 10015)
+- **Notary** - Transaction validation service (Port 10003)
+- **Observer** - AML/compliance monitoring (Port 10018)
 
-See https://docs.corda.net/getting-set-up.html.
+### Client APIs
+- **KDR Client API** - Central bank operations (Port 10050)
+- **Observer Client API** - Monitoring and reporting (Port 10052)
+- **Notary Client API** - Transaction verification (Port 10051)
 
-# Usage
+## Build and Deployment
 
-## Running tests inside IntelliJ
-	
-We recommend editing your IntelliJ preferences so that you use the Gradle runner - this means that the quasar utils
-plugin will make sure that some flags (like ``-javaagent`` - see below) are
-set for you.
+### Prerequisites
+- Java 17 or higher
+- Gradle 7.6+
+- 8GB RAM minimum
 
-To switch to using the Gradle runner:
+### Build and Deploy Nodes
+```bash
+./gradlew deployNodes
+```
 
-* Navigate to ``Build, Execution, Deployment -> Build Tools -> Gradle -> Runner`` (or search for `runner`)
-  * Windows: this is in "Settings"
-  * MacOS: this is in "Preferences"
-* Set "Delegate IDE build/run actions to gradle" to true
-* Set "Run test using:" to "Gradle Test Runner"
+### Start Corda Network
+```bash
+cd build/nodes
+./runnodes
+```
+Wait for all 6 nodes to start completely before proceeding.
 
-If you would prefer to use the built in IntelliJ JUnit test runner, you can run ``gradlew installQuasar`` which will
-copy your quasar JAR file to the lib directory. You will then need to specify ``-javaagent:lib/quasar.jar``
-and set the run directory to the project root directory for each test.
+### Start Client APIs
+Open three separate terminals:
 
-## Running the nodes
+```bash
+# Terminal 1: KDR Client API
+./gradlew :clients:kdr-client:bootRun
 
-See https://docs.corda.net/tutorial-cordapp.html#running-the-example-cordapp.
+# Terminal 2: Observer Client API  
+./gradlew :clients:observer-client:bootRun
 
-## Interacting with the nodes
+# Terminal 3: Notary Client API
+./gradlew :clients:notary-client:bootRun
+```
 
-### Shell
+## Terminal Commands for 12 Flows
 
-When started via the command line, each node will display an interactive shell:
+### Prerequisites for Terminal Commands
+Connect to any node's shell:
+```bash
+# Connect to KDR node
+ssh user1@localhost -p 2221
+# Password: test
+```
 
-    Welcome to the Corda interactive shell.
-    Useful commands include 'help' to see what is available, and 'bye' to shut down the node.
-    
-    Tue Nov 06 11:58:13 GMT 2018>>>
+### 1. wRDCentralInitFlow
+Initialize KDR's central wallet with initial supply.
+```bash
+flow start wRDCentralInitFlow initialAmount: "100000000000000 IDR"
+```
 
-You can use this shell to interact with your node. For example, enter `run networkMapSnapshot` to see a list of 
-the other nodes on the network:
+### 2. wRDIssuanceInitFlow (with walletId)
+Issue wRD from KDR to wholesaler using specific source wallet.
+```bash
+# First get the central wallet ID
+run vaultQuery contractStateType: com.trace.states.wRDAccountState
 
-    Tue Nov 06 11:58:13 GMT 2018>>> run networkMapSnapshot
-    [
-      {
-      "addresses" : [ "localhost:10002" ],
-      "legalIdentitiesAndCerts" : [ "O=Notary, L=London, C=GB" ],
-      "platformVersion" : 3,
-      "serial" : 1541505484825
-    },
-      {
-      "addresses" : [ "localhost:10005" ],
-      "legalIdentitiesAndCerts" : [ "O=PartyA, L=London, C=GB" ],
-      "platformVersion" : 3,
-      "serial" : 1541505382560
-    },
-      {
-      "addresses" : [ "localhost:10008" ],
-      "legalIdentitiesAndCerts" : [ "O=PartyB, L=New York, C=US" ],
-      "platformVersion" : 3,
-      "serial" : 1541505384742
-    }
-    ]
-    
-    Tue Nov 06 12:30:11 GMT 2018>>> 
+# Then issue using walletId
+flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "10000000000 IDR", sourceWalletId: "a4dbb70a-6154-422b-a89f-8c8e5012235f"
+```
 
-You can find out more about the node shell [here](https://docs.corda.net/shell.html).
+### 3. wRDIssuanceFlow (legacy)
+Standard wRD issuance without walletId specification.
+```bash
+flow start wRDIssuanceFlow receiver: "O=Wholesaler1,L=Jakarta,C=ID", amount: "10000000000 IDR"
+```
 
-### Client
+### 4. wRDTransferFlow (with walletId)
+Transfer wRD between wholesaler wallets.
+```bash
+flow start wRDTransferFlow receiver: "O=Wholesaler2,L=Surabaya,C=ID", amount: "1000000000 IDR", sourceWalletId: "source-wallet-id", targetWalletId: "target-wallet-id"
+```
 
-`clients/src/main/java/com/template/Client.java` defines a simple command-line client that connects to a node via RPC 
-and prints a list of the other nodes on the network.
+### 5. wRD2rRDIssuanceInitFlow (with walletId)
+Convert wRD to rRD for peritel operations.
+```bash
+flow start wRD2rRDIssuanceInitFlow amount: "5000000000 IDR", sourceWalletId: "wrd-wallet-id", targetWalletId: "rrd-peritel-wallet-id"
+```
 
-#### Running the client
+### 6. wRD2rRDIssuanceFlow (legacy)
+Standard wRD to rRD conversion using owner string.
+```bash
+flow start wRD2rRDIssuanceFlow amount: "5000000000 IDR", peritelOwner: "Wholesaler1-P-peritel-001"
+```
 
-##### Via the command line
+### 7. rRDIssuanceInitFlow (with walletId)
+Issue rRD from peritel to retail wallets.
+```bash
+flow start rRDIssuanceInitFlow amount: "1000000000 IDR", sourceWalletId: "peritel-wallet-id", targetWalletId: "retail-wallet-id"
+```
 
-Run the `runTemplateClient` Gradle task. By default, it connects to the node with RPC address `localhost:10006` with 
-the username `user1` and the password `test`.
+### 8. rRDIssuanceFlow (legacy)
+Standard rRD issuance using owner string.
+```bash
+flow start rRDIssuanceFlow amount: "1000000000 IDR", retailOwner: "Wholesaler1-R-retail-001"
+```
 
-##### Via IntelliJ
+### 9. rRDTransferFlow
+Transfer rRD between retail users.
+```bash
+flow start rRDTransferFlow receiverOwner: "Wholesaler1-R-retail-002", amount: "500000000 IDR"
+```
 
-Run the `Run Template Client` run configuration. By default, it connects to the node with RPC address `localhost:10006` 
-with the username `user1` and the password `test`.
+### 10. wRDRedemptionFlow (with walletId)
+Redeem wRD back to KDR.
+```bash
+flow start wRDRedemptionFlow kdr: "O=KDR,L=Jakarta,C=ID", amount: "2000000000 IDR", sourceWalletId: "wholesaler-wallet-id", targetWalletId: "kdr-wallet-id"
+```
 
-### Webserver
+### 11. rRD2wRDRedemptionFlow (with walletId)
+Convert rRD back to wRD.
+```bash
+flow start rRD2wRDRedemptionFlow amount: "1000000000 IDR", sourceWalletId: "rrd-wallet-id", targetWalletId: "wrd-wallet-id"
+```
 
-`clients/src/main/java/com/template/webserver/` defines a simple Spring webserver that connects to a node via RPC and 
-allows you to interact with the node over HTTP.
+### 12. rRDRedemptionFlow (legacy)
+Redeem rRD using owner string.
+```bash
+flow start rRDRedemptionFlow amount: "500000000 IDR", retailOwner: "Wholesaler1-R-retail-001"
+```
 
-The API endpoints are defined here:
+## Vault Query Commands
 
-     clients/src/main/java/com/template/webserver/Controller.java
+### Query All wRD States
+```bash
+run vaultQuery contractStateType: com.trace.states.wRDAccountState
+```
 
-And a static webpage is defined here:
+### Query All rRD States
+```bash
+run vaultQuery contractStateType: com.trace.states.rRDAccountState
+```
 
-     clients/src/main/resources/static/
+### Query by Wallet ID
+```bash
+run vaultQuery contractStateType: com.trace.states.wRDAccountState, criteria: {linearId: {externalId: null, id: "a4dbb70a-6154-422b-a89f-8c8e5012235f"}}
+```
 
-#### Running the webserver
+### Query Unconsumed States Only
+```bash
+run vaultQuery contractStateType: com.trace.states.wRDAccountState, criteria: {status: UNCONSUMED}
+```
 
-##### Via the command line
+### Query by Owner
+```bash
+run vaultQuery contractStateType: com.trace.states.wRDAccountState, criteria: {externalIds: ["O=KDR,L=Jakarta,C=ID"]}
+```
 
-Run the `runTemplateServer` Gradle task. By default, it connects to the node with RPC address `localhost:10006` with 
-the username `user1` and the password `test`, and serves the webserver on port `localhost:10050`.
+## Client API Documentation
 
-##### Via IntelliJ
+### KDR Client API (http://localhost:10050/api/kdr)
 
-Run the `Run Template Server` run configuration. By default, it connects to the node with RPC address `localhost:10006` 
-with the username `user1` and the password `test`, and serves the webserver on port `localhost:10050`.
+#### System Information Endpoints
 
-#### Interacting with the webserver
+**GET /status**
+```bash
+curl http://localhost:10050/api/kdr/status
+```
 
-The static webpage is served on:
+**GET /me**
+```bash
+curl http://localhost:10050/api/kdr/me
+```
+Response:
+```json
+{
+  "me": "O=KDR, L=Jakarta, C=ID"
+}
+```
 
-    http://localhost:10050
+**GET /peers**
+```bash
+curl http://localhost:10050/api/kdr/peers
+```
+Response:
+```json
+{
+  "peers": [
+    "O=Wholesaler1, L=Jakarta, C=ID",
+    "O=Wholesaler2, L=Surabaya, C=ID",
+    "O=Wholesaler3, L=Bandung, C=ID",
+    "O=Observer, L=Jakarta, C=ID"
+  ]
+}
+```
 
-While the sole template endpoint is served on:
+**GET /notaries**
+```bash
+curl http://localhost:10050/api/kdr/notaries
+```
 
-    http://localhost:10050/templateendpoint
-    
-# Extending the template
+#### Wallet Management Endpoints
 
-You should extend this template as follows:
+**GET /wallets**
+```bash
+curl http://localhost:10050/api/kdr/wallets
+```
+Response:
+```json
+[
+  {
+    "owner": "O=KDR, L=Jakarta, C=ID",
+    "walletId": "a4dbb70a-6154-422b-a89f-8c8e5012235f",
+    "amount": 99990000000000,
+    "stateRef": "D18EB9E050542EFCA477BE3DD5111651D02E4C1732985FAD50AE36EB97A000C2(0)",
+    "currency": "IDR",
+    "tokenType": "IDR",
+    "issuer": "O=KDR, L=Jakarta, C=ID"
+  }
+]
+```
 
-* Add your own state and contract definitions under `contracts/src/main/java/`
-* Add your own flow definitions under `workflows/src/main/java/`
-* Extend or replace the client and webserver under `clients/src/main/java/`
+**GET /wallet/{walletId}**
+```bash
+curl http://localhost:10050/api/kdr/wallet/a4dbb70a-6154-422b-a89f-8c8e5012235f
+```
 
-For a guided example of how to extend this template, see the Hello, World! tutorial 
-[here](https://docs.corda.net/hello-world-introduction.html).
+**GET /all-wallets**
+```bash
+curl http://localhost:10050/api/kdr/all-wallets
+```
+
+**GET /total-balance**
+```bash
+curl http://localhost:10050/api/kdr/total-balance
+```
+
+#### Flow Operation Endpoints
+
+**POST /central-init**
+```bash
+curl -X POST http://localhost:10050/api/kdr/central-init \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "amount=100000000000000&currency=IDR"
+```
+Request Body Parameters:
+- `amount` (long): Initial amount in smallest currency unit
+- `currency` (string): Currency code (IDR)
+
+**POST /issuance-init**
+```bash
+curl -X POST http://localhost:10050/api/kdr/issuance-init \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "wholesaler=O=Wholesaler1,L=Jakarta,C=ID&amount=10000000000&currency=IDR&sourceWalletId=a4dbb70a-6154-422b-a89f-8c8e5012235f"
+```
+Request Body Parameters:
+- `wholesaler` (string): Target wholesaler X500 name
+- `amount` (long): Amount to issue
+- `currency` (string): Currency code
+- `sourceWalletId` (string, optional): Source wallet ID
+
+**POST /issuance**
+```bash
+curl -X POST http://localhost:10050/api/kdr/issuance \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "partyName=O=Wholesaler1,L=Jakarta,C=ID&amount=10000000000&currency=IDR"
+```
+Request Body Parameters:
+- `partyName` (string): Target party X500 name
+- `amount` (long): Amount to issue
+- `currency` (string): Currency code
+
+**POST /transfer**
+```bash
+curl -X POST http://localhost:10050/api/kdr/transfer \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "partyName=O=Wholesaler2,L=Surabaya,C=ID&amount=1000000000&currency=IDR&sourceWalletId=source-id&targetWalletId=target-id"
+```
+Request Body Parameters:
+- `partyName` (string): Target party X500 name
+- `amount` (long): Transfer amount
+- `currency` (string): Currency code
+- `sourceWalletId` (string, optional): Source wallet ID
+- `targetWalletId` (string, optional): Target wallet ID
+
+**POST /wrd-to-rrd**
+```bash
+curl -X POST http://localhost:10050/api/kdr/wrd-to-rrd \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "amount=5000000000&currency=IDR&sourceWalletId=wrd-wallet-id&targetWalletId=rrd-wallet-id"
+```
+Request Body Parameters:
+- `amount` (long): Conversion amount
+- `currency` (string): Currency code
+- `sourceWalletId` (string, optional): Source wRD wallet ID
+- `targetWalletId` (string, optional): Target rRD wallet ID
+
+**POST /rrd-issuance**
+```bash
+curl -X POST http://localhost:10050/api/kdr/rrd-issuance \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "amount=1000000000&currency=IDR&sourceWalletId=peritel-wallet-id&targetWalletId=retail-wallet-id"
+```
+Request Body Parameters:
+- `amount` (long): Issuance amount
+- `currency` (string): Currency code
+- `sourceWalletId` (string, optional): Source peritel wallet ID
+- `targetWalletId` (string, optional): Target retail wallet ID
+
+**POST /redemption**
+```bash
+curl -X POST http://localhost:10050/api/kdr/redemption \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "amount=2000000000&currency=IDR&sourceWalletId=wholesaler-wallet-id"
+```
+Request Body Parameters:
+- `amount` (long): Redemption amount
+- `currency` (string): Currency code
+- `sourceWalletId` (string, optional): Source wallet ID
+
+**POST /rrd-to-wrd**
+```bash
+curl -X POST http://localhost:10050/api/kdr/rrd-to-wrd \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "amount=1000000000&currency=IDR&sourceWalletId=rrd-wallet-id&targetWalletId=wrd-wallet-id"
+```
+Request Body Parameters:
+- `amount` (long): Conversion amount
+- `currency` (string): Currency code
+- `sourceWalletId` (string, optional): Source rRD wallet ID
+- `targetWalletId` (string, optional): Target wRD wallet ID
+
+### Observer Client API (http://localhost:10052/api/observer)
+
+#### System Information
+
+**GET /status**
+```bash
+curl http://localhost:10052/api/observer/status
+```
+
+**GET /me**
+```bash
+curl http://localhost:10052/api/observer/me
+```
+
+#### Transaction Monitoring
+
+**GET /wrd-transactions**
+```bash
+curl http://localhost:10052/api/observer/wrd-transactions
+```
+Response: Array of wRD transaction details with wallet information.
+
+**GET /rrd-transactions**
+```bash
+curl http://localhost:10052/api/observer/rrd-transactions
+```
+Response: Array of rRD transaction details with wallet information.
+
+**GET /all-transactions**
+```bash
+curl http://localhost:10052/api/observer/all-transactions
+```
+Response: Combined array of all transaction types.
+
+### Notary Client API (http://localhost:10051/api/notary)
+
+#### System Information
+
+**GET /status**
+```bash
+curl http://localhost:10051/api/notary/status
+```
+
+**GET /me**
+```bash
+curl http://localhost:10051/api/notary/me
+```
+
+**GET /notary-nodes**
+```bash
+curl http://localhost:10051/api/notary/notary-nodes
+```
+Response:
+```json
+[
+  {
+    "name": "O=Notary, L=Jakarta, C=ID",
+    "organisation": "Notary",
+    "locality": "Jakarta",
+    "country": "ID",
+    "publicKey": "...",
+    "addresses": ["localhost:10002"]
+  }
+]
+```
+
+#### Transaction Verification
+
+**GET /notarized-transactions**
+```bash
+curl http://localhost:10051/api/notary/notarized-transactions
+```
+Response: Array of notarized transactions with signature details.
+
+**GET /transaction-details/{txId}**
+```bash
+curl http://localhost:10051/api/notary/transaction-details/D18EB9E050542EFCA477BE3DD5111651D02E4C1732985FAD50AE36EB97A000C2
+```
+Response: Detailed transaction information including notary signatures.
+
+**GET /network-map**
+```bash
+curl http://localhost:10051/api/notary/network-map
+```
+Response: Network topology and node information.
+
+## WalletId Architecture
+
+### Wallet Types
+1. **Central Wallets** - KDR's main issuance wallets
+2. **Wholesaler Wallets** - Bank/institution wRD wallets
+3. **Peritel Wallets** - Semi-retail rRD wallets
+4. **Retail Wallets** - End-user rRD wallets
+
+### Benefits
+- **Multi-Wallet Support**: Entities can have multiple wallets
+- **Precise Operations**: Target specific wallets for transactions
+- **Complete Audit Trail**: Full traceability of wallet-to-wallet transfers
+- **Backward Compatibility**: Legacy constructors still supported
+
+### Usage Guidelines
+- Always use walletId parameters for new implementations
+- Query vault to get available wallet IDs before operations
+- Validate wallet ownership before executing flows
+- Use meaningful wallet identification patterns
+
+## Error Handling
+
+### Common HTTP Status Codes
+- `200 OK` - Successful operation
+- `201 Created` - Resource created successfully
+- `400 Bad Request` - Invalid parameters or insufficient balance
+- `404 Not Found` - Wallet or resource not found
+- `500 Internal Server Error` - Flow execution error
+
+### Common Validation Errors
+- **Wallet Not Found**: Invalid walletId provided
+- **Insufficient Balance**: Not enough funds in source wallet
+- **Ownership Mismatch**: Wallet doesn't belong to initiating party
+- **Type Mismatch**: Wrong wallet type for operation
+
+## Troubleshooting
+
+### Nodes Won't Start
+- Verify Java 17+ is installed
+- Check port availability (10002-10018)
+- Ensure sufficient disk space (minimum 2GB)
+
+### API Connection Fails
+- Confirm all nodes are fully started
+- Verify RPC port configuration
+- Check firewall settings
+
+### Flow Execution Errors
+- Validate wallet IDs exist using vault queries
+- Check sufficient balance in source wallets
+- Ensure target parties are online and responsive
+
+## Development and Testing
+
+### Project Structure
+```
+├── contracts/          # Smart contracts and states
+├── workflows/          # Flow implementations
+├── clients/           # REST API clients
+│   ├── kdr-client/    # Central bank API
+│   ├── notary-client/ # Notary services API
+│   └── observer-client/ # Monitoring API
+└── build/             # Generated artifacts and nodes
+```
+
+### Running Tests
+```bash
+# Run all tests
+./gradlew test
+
+# Run specific test suite
+./gradlew :workflows:test --tests "*WalletIdFlowTest*"
+```
+
+### Monitoring and Logs
+- Node logs: `build/nodes/*/logs/`
+- API logs: Available via client startup terminals
+- Transaction monitoring: Observer Client API endpoints

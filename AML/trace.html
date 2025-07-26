@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central Bank - CBDC Monitoring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .sidebar-nav .active {
+            background-color: #ef4444;
+            color: white;
+        }
+        .sidebar-nav a {
+            transition: all 0.2s ease-in-out;
+        }
+        .tab-active {
+            background-color: white;
+            border-color: #e5e7eb;
+            color: #1f2937;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            background-color: #f9fafb;
+            border-color: transparent;
+            color: #6b7280;
+        }
+        .table-header {
+            background-color: #f9fafb;
+        }
+        .suspicious-item.active {
+            background-color: #eff6ff;
+            border-left-color: #3b82f6;
+        }
+        /* Network Diagram Styles */
+        .network-node {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid;
+            background-color: white;
+            text-align: center;
+            font-size: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .network-arrow {
+            position: absolute;
+            stroke: #6b7280;
+            stroke-width: 1.5;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-100 border-r border-gray-200 flex flex-col">
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+            <h1 class="text-xl font-bold text-gray-800">TRACE</h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-2 sidebar-nav">
+            <a href="#" class="flex items-center px-4 py-2.5 rounded-md text-gray-700 hover:bg-gray-200 active" data-view="overview">
+                <i data-lucide="layout-dashboard" class="mr-3 h-5 w-5"></i>
+                <span>Overview</span>
+            </a>
+            <a href="#" class="flex items-center px-4 py-2.5 rounded-md text-gray-700 hover:bg-gray-200" data-view="observer">
+                <i data-lucide="arrow-left-right" class="mr-3 h-5 w-5"></i>
+                <span>Observer Transactions</span>
+            </a>
+            <a href="#" class="flex items-center px-4 py-2.5 rounded-md text-gray-700 hover:bg-gray-200" data-view="analytic">
+                <i data-lucide="pie-chart" class="mr-3 h-5 w-5"></i>
+                <span>Analytic & Review</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col">
+        <!-- Header -->
+        <header class="h-16 flex items-center justify-end px-6 border-b border-gray-200 bg-white">
+            <div class="relative">
+                <button id="user-account-btn" class="flex items-center">
+                    <span class="text-gray-700 font-medium mr-4">User Account</span>
+                    <img class="h-10 w-10 rounded-full object-cover" src="https://placehold.co/100x100/E2E8F0/4A5568?text=UA" alt="User avatar">
+                </button>
+                <!-- User Account Dropdown -->
+                <div id="user-account-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl overflow-hidden z-20 border">
+                    <a href="#" class="flex items-center px-4 py-3 text-sm text-gray-600 hover:bg-gray-100">
+                        <i data-lucide="user" class="h-4 w-4 mr-2"></i> Profile
+                    </a>
+                    <a href="#" class="flex items-center px-4 py-3 text-sm text-gray-600 hover:bg-gray-100">
+                        <i data-lucide="settings" class="h-4 w-4 mr-2"></i> Settings
+                    </a>
+                    <hr>
+                    <a href="#" class="flex items-center px-4 py-3 text-sm text-red-600 hover:bg-gray-100">
+                        <i data-lucide="log-out" class="h-4 w-4 mr-2"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="flex-1 p-8 overflow-y-auto">
+            <!-- Overview Page -->
+            <div id="overview-view" class="page-view">
+                <h2 class="text-2xl font-semibold text-gray-900 mb-6">Overview</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="font-semibold text-gray-800 mb-1">Amount of CBDC wRD in circulation</h3>
+                        <p class="text-sm text-gray-500 mb-4">Graph balance over time</p>
+                        <div id="balance-over-time-chart"></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 flex flex-col justify-between">
+                        <div class="space-y-6">
+                            <div>
+                                <p class="text-sm text-gray-500">Balance wRD (Central Bank)</p>
+                                <p id="bi-balance-kpi" class="text-2xl font-bold text-gray-800">Loading...</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Total Balance wRD (All Banks)</p>
+                                <p id="total-banks-kpi" class="text-2xl font-bold text-gray-800">Loading...</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Percentage</p>
+                                <p id="percentage-kpi" class="text-2xl font-bold text-blue-600">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 bg-white p-6 rounded-lg border border-gray-200">
+                    <h3 class="font-semibold text-gray-800 mb-1">Commercial Banks Reserves</h3>
+                    <p class="text-sm text-gray-500 mb-4">Bar chart of balance for each commercial bank</p>
+                    <div id="commercial-banks-reserves-chart"></div>
+                </div>
+                 <div class="mt-8 bg-white rounded-lg border border-gray-200">
+                    <h3 class="font-semibold text-gray-800 p-6">Recent High-Priority Alerts</h3>
+                    <div id="recent-alerts-list" class="divide-y divide-gray-200">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Observer Transactions Page -->
+            <div id="observer-view" class="page-view hidden">
+                <h2 class="text-2xl font-semibold text-gray-900 mb-6">Transaksi Observer</h2>
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-6">
+                        <div id="tx-tabs" class="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+                            <button class="px-4 py-2 text-sm rounded-md tab-active" data-tab="wrd">Transaksi wRD</button>
+                            <button class="px-4 py-2 text-sm rounded-md tab-inactive" data-tab="rrd">Transaksi rRD</button>
+                        </div>
+                        <div class="flex items-center">
+                            <label for="sort-by" class="text-sm font-medium text-gray-700 mr-2">Urutkan:</label>
+                            <select id="sort-by" class="rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <option>Terbaru</option>
+                                <option>Jumlah (Tertinggi)</option>
+                                <option>Jumlah (Terendah)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="wrd-table-container" class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase table-header">
+                                <tr>
+                                    <th class="px-6 py-3">requestedDate</th>
+                                    <th class="px-6 py-3">updatedDate</th>
+                                    <th class="px-6 py-3">typeTx</th>
+                                    <th class="px-6 py-3">from</th>
+                                    <th class="px-6 py-3">to</th>
+                                    <th class="px-6 py-3">amount</th>
+                                    <th class="px-6 py-3">status</th>
+                                    <th class="px-6 py-3">TxId</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wrd-tx-table">
+                                <!-- Data populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="rrd-table-container" class="overflow-x-auto hidden">
+                         <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase table-header">
+                                <tr>
+                                    <th class="px-6 py-3">requestedDate</th>
+                                    <th class="px-6 py-3">updatedDate</th>
+                                    <th class="px-6 py-3">typeTx</th>
+                                    <th class="px-6 py-3">from</th>
+                                    <th class="px-6 py-3">to</th>
+                                    <th class="px-6 py-3">amount</th>
+                                    <th class="px-6 py-3">status</th>
+                                    <th class="px-6 py-3">TxId</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rrd-tx-table">
+                                <!-- Data populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytic & Review Page -->
+            <div id="analytic-view" class="page-view hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-900">Analisis & Tinjauan</h2>
+                    <button class="bg-yellow-400 text-yellow-900 font-semibold px-6 py-2 rounded-lg hover:bg-yellow-500 flex items-center">
+                        <span class="mr-2">Perlu Ditinjau</span>
+                        <span id="review-count" class="bg-yellow-900 text-yellow-300 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"></span>
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 bg-white p-6 rounded-lg border border-gray-200">
+                        <div class="flex justify-between items-center mb-4">
+                             <h3 class="font-semibold text-gray-800">Transaksi Observer Mencurigakan</h3>
+                             <div class="flex items-center">
+                                <label for="sort-by-analytic" class="text-sm font-medium text-gray-700 mr-2">Urutkan:</label>
+                                <select id="sort-by-analytic" class="rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                    <option>Skor Risiko</option>
+                                    <option>Terbaru</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="suspicious-tx-list" class="space-y-2 h-[350px] overflow-y-auto pr-2">
+                           <!-- Suspicious transactions populated by JS -->
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="font-semibold text-gray-800 mb-4">Diagram Jaringan</h3>
+                        <div id="analytic-network-diagram" class="relative h-[350px] flex items-center justify-center bg-gray-50 rounded-md overflow-hidden">
+                             <p class="text-gray-500">Pilih transaksi untuk melihat jaringan.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 bg-white p-6 rounded-lg border border-gray-200">
+                    <h3 class="font-semibold text-gray-800 mb-4">Tinjauan Riwayat</h3>
+                    <div id="history-review-table" class="overflow-x-auto">
+                        <div class="h-80 flex items-center justify-center bg-gray-50 rounded-md">
+                            <p class="text-gray-500">Pilih transaksi mencurigakan untuk melihat riwayat lengkap.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Transaction Detail Modal -->
+    <div id="tx-detail-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 class="text-xl font-bold text-gray-900">Detail Transaksi</h3>
+                <button id="close-modal-btn" class="p-2 rounded-full hover:bg-gray-200">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="mt-4">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- MOCK DATA ---
+        const mockWalletsData = [
+            { name: 'Bank Indonesia', balance: 1250700000000000 },
+            { name: 'Bank Mandiri', balance: 450000000000000 },
+            { name: 'BCA', balance: 380000000000000 },
+            { name: 'BRI', balance: 520000000000000 },
+            { name: 'BNI', balance: 290000000000000 },
+            { name: 'Bank Digital Indo', balance: 410000000000000 },
+            { name: 'GoPay Finance', balance: 350000000000000 },
+            { name: 'DANA', balance: 480000000000000 }
+        ];
+
+        const mockAllTransactions = [
+            { requestedDate: '2025-07-26', updatedDate: '2025-07-26', typeTx: 'wRD-Penerbitan', from: 'Bank Indonesia', to: 'Bank Digital Indo', amount: 500000000000, status: 'Selesai', TxId: '0xabc123def456' },
+            { requestedDate: '2025-07-26', updatedDate: '2025-07-26', typeTx: 'wRD-Transfer', from: 'Bank Digital Indo', to: 'GoPay Finance', amount: 120000000000, status: 'Selesai', TxId: '0xdef456abc123' },
+            { requestedDate: '2025-07-25', updatedDate: '2025-07-25', typeTx: 'wRD-Penarikan', from: 'GoPay Finance', to: 'Bank Indonesia', amount: 75000000000, status: 'Selesai', TxId: '0xghi789jkl101' },
+            { requestedDate: '2025-07-25', updatedDate: '2025-07-25', typeTx: 'wRD-Penerbitan', from: 'Bank Indonesia', to: 'Bank Mandiri', amount: 250000000000, status: 'Selesai', TxId: '0xjkl101ghi789' },
+            { requestedDate: '2025-07-26', updatedDate: '2025-07-26', typeTx: 'PEMBAYARAN', from: 'C789... (Siti)', to: 'M123... (Toko Jaya)', amount: 125000, status: 'Selesai', TxId: '0x3c4d5e6f7g8h' },
+            { requestedDate: '2025-07-26', updatedDate: '2025-07-26', typeTx: 'TRANSFER', from: 'C123... (Budi)', to: 'C456... (Ani)', amount: 50000, status: 'Selesai', TxId: '0x1a2b3c4d5e6f' },
+            { requestedDate: '2025-07-25', updatedDate: '2025-07-25', typeTx: 'TARIK_TUNAI', from: 'C101... (Eko)', to: 'Agen BRILink', amount: 1000000, status: 'Tertunda', TxId: '0x5e6f7g8h9i0j' },
+            { requestedDate: '2025-07-25', updatedDate: '2025-07-25', typeTx: 'SETOR_TUNAI', from: 'Agen DANA', to: 'C112... (Dewi)', amount: 500000, status: 'Selesai', TxId: '0x7g8h9i0j1k2l' },
+            { requestedDate: '2025-07-24', updatedDate: '2025-07-24', typeTx: 'DEBIT', from: 'C113... (Fajar)', to: 'PLN', amount: 75000, status: 'Selesai', TxId: '0x9i0j1k2l3m4n' },
+            { requestedDate: '2025-07-24', updatedDate: '2025-07-24', typeTx: 'TRANSFER', from: 'C114... (Gita)', to: 'C115... (Hadi)', amount: 25000, status: 'Selesai', TxId: '0x1k2l3m4n5o6p' },
+            { requestedDate: '2025-07-26', updatedDate: '2025-07-26', typeTx: 'TRANSFER', from: 'PT Abadi Jaya', to: 'Dompet Risiko Tinggi', amount: 750000000, status: 'Selesai', TxId: '0xSuspicious01' },
+        ];
+        
+        const mockWrdTxData = mockAllTransactions.filter(tx => tx.typeTx.startsWith('wRD'));
+        const mockRrdTxData = mockAllTransactions.filter(tx => !tx.typeTx.startsWith('wRD'));
+
+        const mockAlertsData = [
+            { id: 'A-98341', suspiciousTxId: 'S-001', type: 'Strukturisasi Terdeteksi', description: 'Beberapa setoran di bawah ambang batas dari 12 sumber.', priority: 'Kritis', time: '2m lalu' },
+            { id: 'A-98340', suspiciousTxId: 'S-002', type: 'Aliran Dana Mencurigakan', description: 'Rp 850 Jt kembali ke entitas terkait melalui 4 perantara.', priority: 'Tinggi', time: '15m lalu' },
+            { id: 'A-98339', suspiciousTxId: 'S-003', type: 'Aktivitas Smurfing', description: '25 dompet mendanai satu tujuan.', priority: 'Tinggi', time: '48m lalu' },
+            { id: 'A-98338', suspiciousTxId: 'S-005', type: 'Pergerakan Dana Cepat', description: 'Rp 2.1 M disetor dan ditarik dalam 10 menit.', priority: 'Sedang', time: '2j lalu' },
+        ];
+
+        const mockSuspiciousTxs = [
+            { id: 'S-001', type: 'Strukturisasi', risk: 95, from: 'Beberapa (12)', to: 'Bank Digital Indo', amount: 998000000, details: '12 txns di bawah batas 100jt dalam 5 menit' },
+            { id: 'S-002', type: 'Aliran Melingkar', risk: 88, from: 'Bank Digital Indo', to: '0xGhi...', amount: 850000000, details: 'Aliran dana melingkar terdeteksi oleh GNN' },
+            { id: 'S-003', type: 'Smurfing', risk: 85, from: 'Beberapa (25)', to: '0x789...', amount: 495000000, details: 'Rasio fan-in tidak wajar terdeteksi' },
+            { id: 'S-004', type: 'Transfer Risiko Tinggi', risk: 82, from: 'PT Abadi Jaya', to: 'Dompet Risiko Tinggi', amount: 75000000, details: 'Transaksi ke entitas yang diberi sanksi' },
+            { id: 'S-005', type: 'Pergerakan Cepat', risk: 78, from: '0xJkl...', to: '0xMno...', amount: 2100000000, details: 'Dana dipindahkan < 10 menit setelah deposit' },
+        ];
+        
+        const MOCK_NETWORK_GRAPHS = {
+            'S-001': { type: 'fan-in', nodes: [{ id: 'src1', label: 'C123...', x: '10%', y: '10%' }, { id: 'src2', label: 'C456...', x: '10%', y: '30%' }, { id: 'src3', label: '...', x: '10%', y: '50%' }, { id: 'src4', label: 'C789...', x: '10%', y: '70%' }, { id: 'dest', label: 'Bank Digital Indo', x: '80%', y: '50%' }], edges: [{ from: 'src1', to: 'dest' }, { from: 'src2', to: 'dest' }, { from: 'src3', to: 'dest' }, { from: 'src4', to: 'dest' }] },
+            'S-002': { type: 'circular', nodes: [{ id: 'node1', label: 'Bank Digital Indo', x: '50%', y: '15%' }, { id: 'node2', label: 'PT Sejahtera', x: '85%', y: '50%' }, { id: 'node3', label: 'CV Maju Mundur', x: '50%', y: '85%' }, { id: 'node4', label: '0xGhi...', x: '15%', y: '50%' }], edges: [{ from: 'node1', to: 'node2' }, { from: 'node2', to: 'node3' }, { from: 'node3', to: 'node4' }, { from: 'node4', to: 'node1' }] },
+            'S-003': { type: 'fan-in', nodes: [{ id: 'src1', label: 'C101...', x: '10%', y: '20%' }, { id: 'src2', label: '...', x: '10%', y: '50%' }, { id: 'src3', label: 'C202...', x: '10%', y: '80%' }, { id: 'dest', label: '0x789...', x: '80%', y: '50%' }], edges: [{ from: 'src1', to: 'dest' }, { from: 'src2', to: 'dest' }, { from: 'src3', to: 'dest' }] },
+        };
+
+        // --- UI Elements ---
+        const navLinks = document.querySelectorAll('.sidebar-nav a');
+        const pageViews = document.querySelectorAll('.page-view');
+        const userAccountBtn = document.getElementById('user-account-btn');
+        const userAccountDropdown = document.getElementById('user-account-dropdown');
+        const wrdTxTable = document.getElementById('wrd-tx-table');
+        const rrdTxTable = document.getElementById('rrd-tx-table');
+        const txTabs = document.getElementById('tx-tabs');
+        const wrdTableContainer = document.getElementById('wrd-table-container');
+        const rrdTableContainer = document.getElementById('rrd-table-container');
+        const suspiciousTxList = document.getElementById('suspicious-tx-list');
+        const analyticNetworkDiagram = document.getElementById('analytic-network-diagram');
+        const historyReviewTable = document.getElementById('history-review-table');
+        const reviewCount = document.getElementById('review-count');
+        const recentAlertsList = document.getElementById('recent-alerts-list');
+        const txDetailModal = document.getElementById('tx-detail-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const modalContent = document.getElementById('modal-content');
+
+        // --- Functions ---
+        function switchView(viewId, navLink) {
+            pageViews.forEach(view => view.classList.add('hidden'));
+            const currentView = document.getElementById(viewId);
+            if (currentView) currentView.classList.remove('hidden');
+            
+            document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
+            if (navLink) navLink.classList.add('active');
+        }
+
+        function updateOverviewData() {
+            const biWallet = mockWalletsData.find(w => w.name === 'Bank Indonesia');
+            const commercialWallets = mockWalletsData.filter(w => w.name !== 'Bank Indonesia');
+            const totalCommercialBalance = commercialWallets.reduce((sum, wallet) => sum + wallet.balance, 0);
+            const biBalance = biWallet ? biWallet.balance : 0;
+            const grandTotal = totalCommercialBalance + biBalance;
+            const percentage = grandTotal > 0 ? (biBalance / grandTotal) * 100 : 0;
+
+            document.getElementById('bi-balance-kpi').textContent = `Rp ${(biBalance / 1e12).toFixed(1)} T`;
+            document.getElementById('total-banks-kpi').textContent = `Rp ${(totalCommercialBalance / 1e12).toFixed(1)} T`;
+            document.getElementById('percentage-kpi').textContent = `${percentage.toFixed(2)}%`;
+        }
+        
+        function renderOverviewCharts() {
+            var balanceOptions = {
+                chart: { type: 'area', height: 300, toolbar: { show: false }, zoom: { enabled: false } },
+                series: [{ name: 'Balance (T Rp)', data: [1240, 1245, 1242, 1248, 1251, 1255, 1250.7] }],
+                xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'], labels: { style: { colors: '#6b7280' } } },
+                yaxis: { labels: { style: { colors: '#6b7280' }, formatter: (val) => `${val/1000}K T` } },
+                dataLabels: { enabled: false }, stroke: { curve: 'smooth', width: 2 }, colors: ['#3b82f6'],
+                fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.2, stops: [0, 90, 100] } },
+                tooltip: { y: { formatter: (val) => `Rp ${val} T` } }
+            };
+            var balanceChart = new ApexCharts(document.querySelector("#balance-over-time-chart"), balanceOptions);
+            balanceChart.render();
+
+            const commercialWallets = mockWalletsData.filter(w => w.name !== 'Bank Indonesia');
+            const reserveLabels = commercialWallets.map(w => w.name);
+            const reserveData = commercialWallets.map(w => (w.balance / 1e12).toFixed(0));
+
+            var reservesOptions = {
+                chart: { type: 'bar', height: 350, toolbar: { show: false } },
+                series: [{ name: 'Reserves (T Rp)', data: reserveData }],
+                xaxis: { categories: reserveLabels, labels: { style: { colors: '#6b7280' } } },
+                yaxis: { labels: { style: { colors: '#6b7280' } } },
+                plotOptions: { bar: { columnWidth: '50%', distributed: true } },
+                legend: { show: false },
+                colors: ['#10b981', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'],
+                dataLabels: { enabled: false },
+                tooltip: { y: { formatter: (val) => `Rp ${val} T` } }
+            };
+            var reservesChart = new ApexCharts(document.querySelector("#commercial-banks-reserves-chart"), reservesOptions);
+            reservesChart.render();
+        }
+        
+        function populateTable(tbody, data) {
+             if (!tbody) return;
+             tbody.innerHTML = data.map(tx => `
+                <tr class="bg-white border-b hover:bg-gray-50 cursor-pointer" onclick="showTransactionDetails('${tx.TxId}')">
+                    <td class="px-6 py-4">${tx.requestedDate}</td>
+                    <td class="px-6 py-4">${tx.updatedDate}</td>
+                    <td class="px-6 py-4">${tx.typeTx}</td>
+                    <td class="px-6 py-4 font-mono text-xs">${tx.from}</td>
+                    <td class="px-6 py-4 font-mono text-xs">${tx.to}</td>
+                    <td class="px-6 py-4">Rp ${tx.amount.toLocaleString('id-ID')}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full ${ tx.status === 'Selesai' ? 'bg-green-100 text-green-800' : tx.status === 'Tertunda' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800' }">${tx.status}</span></td>
+                    <td class="px-6 py-4 font-mono text-xs">${tx.TxId.substring(0,10)}...</td>
+                </tr>`).join('');
+        }
+        
+        function populateRecentAlerts() {
+             if (!recentAlertsList) return;
+             recentAlertsList.innerHTML = mockAlertsData.map(alert => `
+                <div class="p-4 flex items-center justify-between hover:bg-gray-50 cursor-pointer" onclick="goToAnalyticViewAndHighlight('${alert.suspiciousTxId}')">
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-full ${alert.priority === 'Kritis' ? 'bg-red-100' : 'bg-orange-100'} mr-4">
+                            <i data-lucide="siren" class="h-5 w-5 ${alert.priority === 'Kritis' ? 'text-red-600' : 'text-orange-600'}"></i>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-800">${alert.type} <span class="text-sm font-normal text-gray-500">- ${alert.id}</span></p>
+                            <p class="text-sm text-gray-600">${alert.description}</p>
+                        </div>
+                    </div>
+                    <div class="text-right"><p class="text-xs text-gray-500">${alert.time}</p></div>
+                </div>`).join('');
+            lucide.createIcons();
+        }
+
+        function populateSuspiciousList() {
+            if (!suspiciousTxList) return;
+            reviewCount.textContent = mockSuspiciousTxs.length;
+            suspiciousTxList.innerHTML = mockSuspiciousTxs.map(tx => `
+                <div class="p-3 border-l-4 border-transparent rounded-r-md cursor-pointer hover:bg-gray-50 suspicious-item" data-txid="${tx.id}">
+                    <div class="flex justify-between items-center">
+                        <p class="font-semibold text-gray-800">${tx.type}</p>
+                        <div class="flex items-center">
+                            <span class="text-sm font-bold ${tx.risk > 90 ? 'text-red-500' : 'text-orange-500'}">${tx.risk}</span>
+                            <i data-lucide="shield-alert" class="h-4 w-4 ml-1 ${tx.risk > 90 ? 'text-red-500' : 'text-orange-500'}"></i>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600">${tx.details}</p>
+                    <p class="text-xs text-gray-400 mt-1 font-mono">${tx.from} -> ${tx.to} | Rp ${tx.amount.toLocaleString('id-ID')}</p>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function updateAnalyticDiagram(txId) {
+            const graphData = MOCK_NETWORK_GRAPHS[txId];
+            analyticNetworkDiagram.innerHTML = '';
+            if (!graphData) {
+                analyticNetworkDiagram.innerHTML = `<p class="text-gray-500">Diagram tidak tersedia.</p>`;
+                return;
+            }
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'absolute w-full h-full top-0 left-0 z-0');
+            svg.innerHTML = `<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" /></marker></defs>`;
+            analyticNetworkDiagram.appendChild(svg);
+            graphData.nodes.forEach(node => {
+                const nodeEl = document.createElement('div');
+                nodeEl.id = `node-${node.id}`;
+                nodeEl.className = 'network-node';
+                nodeEl.style.left = node.x;
+                nodeEl.style.top = node.y;
+                nodeEl.innerHTML = `<p class="font-bold">${node.label}</p>`;
+                analyticNetworkDiagram.appendChild(nodeEl);
+            });
+            setTimeout(() => {
+                graphData.edges.forEach(edge => {
+                    const fromNode = document.getElementById(`node-${edge.from}`);
+                    const toNode = document.getElementById(`node-${edge.to}`);
+                    if (fromNode && toNode) {
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        const fromRect = fromNode.getBoundingClientRect();
+                        const toRect = toNode.getBoundingClientRect();
+                        const containerRect = analyticNetworkDiagram.getBoundingClientRect();
+                        const x1 = fromRect.left + fromRect.width / 2 - containerRect.left;
+                        const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
+                        const x2 = toRect.left + toRect.width / 2 - containerRect.left;
+                        const y2 = toRect.top + toRect.height / 2 - containerRect.top;
+                        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                        line.setAttribute('class', 'network-arrow');
+                        svg.appendChild(line);
+                    }
+                });
+            }, 0);
+        }
+        
+        function updateHistoryReview(txId) {
+            const tx = mockSuspiciousTxs.find(t => t.id === txId);
+            historyReviewTable.innerHTML = `
+                <table class="w-full text-sm text-left text-gray-600">
+                    <thead class="text-xs text-gray-700 uppercase table-header">
+                        <tr><th class="px-6 py-3">Waktu</th><th class="px-6 py-3">Dari</th><th class="px-6 py-3">Ke</th><th class="px-6 py-3">Jumlah</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr class="bg-white border-b"><td class="px-6 py-4">2025-07-26 10:05</td><td class="px-6 py-4 font-mono text-xs">${tx.from}</td><td class="px-6 py-4 font-mono text-xs">${tx.to}</td><td class="px-6 py-4">Rp ${tx.amount.toLocaleString('id-ID')}</td></tr>
+                    </tbody>
+                </table>`;
+        }
+        
+        function showTransactionDetails(txId) {
+            const allTxs = [...mockWrdTxData, ...mockRrdTxData];
+            const tx = allTxs.find(t => t.TxId === txId);
+            if (!tx) return;
+            modalContent.innerHTML = `
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <p class="text-gray-500">requestedDate</p><p class="text-gray-800 font-medium">${tx.requestedDate}</p>
+                    <p class="text-gray-500">updatedDate</p><p class="text-gray-800 font-medium">${tx.updatedDate}</p>
+                    <p class="text-gray-500">typeTx</p><p class="text-gray-800 font-medium">${tx.typeTx}</p>
+                    <p class="text-gray-500">from</p><p class="text-gray-800 font-medium font-mono text-xs">${tx.from}</p>
+                    <p class="text-gray-500">to</p><p class="text-gray-800 font-medium font-mono text-xs">${tx.to}</p>
+                    <p class="text-gray-500">amount</p><p class="text-gray-800 font-medium">Rp ${tx.amount.toLocaleString('id-ID')}</p>
+                    <p class="text-gray-500">status</p><p><span class="px-2 py-1 text-xs font-medium rounded-full ${ tx.status === 'Selesai' ? 'bg-green-100 text-green-800' : tx.status === 'Tertunda' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800' }">${tx.status}</span></p>
+                    <p class="text-gray-500 col-span-2 mt-2">TxId</p>
+                    <p class="text-gray-800 font-medium font-mono text-xs col-span-2 break-all">${tx.TxId}</p>
+                </div>
+            `;
+            txDetailModal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function goToAnalyticViewAndHighlight(suspiciousTxId) {
+            const analyticLink = document.querySelector('a[data-view="analytic"]');
+            switchView('analytic-view', analyticLink);
+
+            setTimeout(() => {
+                const targetItem = document.querySelector(`.suspicious-item[data-txid="${suspiciousTxId}"]`);
+                if (targetItem) {
+                    targetItem.click();
+                    targetItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+
+        // --- Event Listeners ---
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const viewId = link.dataset.view + '-view';
+                switchView(viewId, link);
+            });
+        });
+
+        if (txTabs) {
+            txTabs.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    txTabs.querySelectorAll('button').forEach(btn => { btn.classList.remove('tab-active'); btn.classList.add('tab-inactive'); });
+                    e.target.classList.add('tab-active'); e.target.classList.remove('tab-inactive');
+                    if (e.target.dataset.tab === 'wrd') {
+                        wrdTableContainer.classList.remove('hidden'); rrdTableContainer.classList.add('hidden');
+                    } else {
+                        wrdTableContainer.classList.add('hidden'); rrdTableContainer.classList.remove('hidden');
+                    }
+                }
+            });
+        }
+
+        suspiciousTxList.addEventListener('click', (e) => {
+            const item = e.target.closest('.suspicious-item');
+            if (item) {
+                document.querySelectorAll('.suspicious-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                const txId = item.dataset.txid;
+                updateAnalyticDiagram(txId);
+                updateHistoryReview(txId);
+            }
+        });
+
+        userAccountBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            userAccountDropdown.classList.toggle('hidden');
+            lucide.createIcons();
+        });
+
+        document.addEventListener('click', (event) => {
+            if (userAccountDropdown && !userAccountDropdown.classList.contains('hidden') && !userAccountDropdown.contains(event.target) && !userAccountBtn.contains(event.target)) {
+                userAccountDropdown.classList.add('hidden');
+            }
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            txDetailModal.classList.add('hidden');
+        });
+        
+        // --- Initial Load ---
+        window.onload = () => {
+            lucide.createIcons();
+            updateOverviewData();
+            renderOverviewCharts();
+            populateTable(wrdTxTable, mockWrdTxData);
+            populateTable(rrdTxTable, mockRrdTxData);
+            populateSuspiciousList();
+            populateRecentAlerts();
+        };
+
+    </script>
+</body>
+</html>

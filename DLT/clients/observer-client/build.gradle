@@ -1,0 +1,57 @@
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url 'https://dl.bintray.com/kotlin/exposed' }
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://download.corda.net/maven/corda-releases' }
+}
+
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+
+dependencyManagement {
+    dependencies {
+        dependency "org.apache.logging.log4j:log4j-slf4j2-impl:$log4j_version"
+    }
+}
+
+configurations {
+    all {
+        exclude group: 'ch.qos.logback', module: 'logback-classic'
+    }
+}
+
+dependencies {
+    // Corda dependencies.
+    implementation "$corda_release_group:corda-rpc:$corda_release_version"
+    implementation "net.corda:corda-jackson:$corda_release_version"
+    implementation "$corda_core_release_group:corda-core:$corda_core_release_version"
+    
+    // CorDapp dependencies.
+    implementation project(":contracts")
+    implementation project(":workflows")
+    
+    implementation("org.springframework.boot:spring-boot-starter-websocket:$spring_boot_version") {
+        exclude group: "org.springframework.boot", module: "spring-boot-starter-logging"
+    }
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:$spring_boot_version") {
+        exclude group: "org.springframework.boot", module: "spring-boot-starter-logging"
+    }
+    runtimeOnly 'com.h2database:h2'
+    implementation "org.apache.logging.log4j:log4j-slf4j2-impl:${log4j_version}"
+    implementation "org.apache.logging.log4j:log4j-web:${log4j_version}"
+    implementation "org.slf4j:jul-to-slf4j:$slf4j_version"
+    implementation "org.bouncycastle:bcprov-jdk18on:1.75"
+    implementation "org.bouncycastle:bcpkix-jdk18on:1.75"
+    implementation "javax.annotation:javax.annotation-api:1.2"
+    
+    testImplementation "org.springframework.boot:spring-boot-starter-test:$spring_boot_version"
+}
+
+springBoot {
+    mainClass = "com.trace.observer.server.Server"
+}
+
+jar {
+    duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+}

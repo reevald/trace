@@ -29,7 +29,7 @@ dependencies {
 }
 
 springBoot {
-    mainClass = "com.template.webserver.Server"
+    mainClass = "com.trace.webserver.Server"
 }
 
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
@@ -45,17 +45,17 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
  * execute your rpc methods in the main method of the client.kt. You can somewhat see this as a quick test of making
  * RPC calls to your nodes.
  */
-task runTemplateClient(type: JavaExec, dependsOn: assemble) {
+task runDLTClient(type: JavaExec, dependsOn: assemble) {
     classpath = sourceSets.main.runtimeClasspath
-    main = 'com.template.Client'
+    main = 'com.trace.Client'
     args 'localhost:10006', 'user1', 'test'
 }
 
 /* This task will start the springboot server that connects to your node (via RPC connection). All of the http requests
  * are in the Controller file. You can leave the Server.kt and NodeRPCConnection.kt file untouched for your use.
  */
-task runTemplateServer(type: JavaExec, dependsOn: assemble) {
+task runDLTServer(type: JavaExec, dependsOn: assemble) {
     classpath = sourceSets.main.runtimeClasspath
-    main = 'com.template.webserver.Starter'
+    main = 'com.trace.webserver.Starter'
     args '--server.port=10050', '--config.rpc.host=localhost', '--config.rpc.port=10006', '--config.rpc.username=user1', '--config.rpc.password=test'
 }

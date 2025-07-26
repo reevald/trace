@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: aml_db
+      POSTGRES_USER: aml_user
+      POSTGRES_PASSWORD: aml_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aml_user -d aml_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  aml-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://aml_user:aml_password@postgres:5432/aml_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  data-fetcher:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://aml_user:aml_password@postgres:5432/aml_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: python services/data_fetcher.py
+
+  aml-analyzer:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://aml_user:aml_password@postgres:5432/aml_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: python services/aml_analyzer.py
+
+  email-alerter:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://aml_user:aml_password@postgres:5432/aml_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: python services/email_alerter.py
+
+volumes:
+  postgres_data:
