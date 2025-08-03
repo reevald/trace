@@ -1,12 +1,7 @@
 package com.trace.contracts;
 
-import com.trace.states.rRDAccountState;
-import com.trace.states.wRDAccountState;
 import net.corda.core.contracts.*;
 import net.corda.core.transactions.LedgerTransaction;
-
-import java.util.Currency;
-import java.util.List;
 
 import static net.corda.core.contracts.ContractsDSL.requireThat;
 
@@ -32,10 +27,6 @@ public class rRDContract implements Contract {
         requireThat(require -> {
             return null;
         });
-    }
-
-    private boolean isKDR(net.corda.core.identity.Party party) {
-        return party.getName().getOrganisation().equals("KDR");
     }
 
     public interface Commands extends CommandData {
