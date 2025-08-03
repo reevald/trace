@@ -67,6 +67,9 @@ public class wRDCentralInitFlow extends FlowLogic<SignedTransaction> {
         // 1. Define all parties involved
         final Party notary = getServiceHub().getNetworkMapCache().getNotary(CordaX500Name.parse("O=Notary,L=Jakarta," +
                 "C=ID"));
+        if (notary == null) {
+            throw new IllegalArgumentException("Notary should be not null.");
+        }
         final Party kdr = getOurIdentity();
 
         // 2. Generating transaction blueprint
@@ -74,13 +77,9 @@ public class wRDCentralInitFlow extends FlowLogic<SignedTransaction> {
         // 2.1 Define output state, this flow only use one output state without input state
         final wRDAccountState outputState = new wRDAccountState(kdr, kdr, "IDR", initialAmount);
         final TransactionBuilder txBuilder;
-        if (notary != null) {
-            txBuilder = new TransactionBuilder(notary)
-                    .addOutputState(outputState, wRDContract.ID)
-                    .addCommand(new wRDContract.Commands.wRDCentralInitCommand(), Arrays.asList(kdr.getOwningKey()));
-        } else {
-            throw new IllegalArgumentException("Notary should be not null.");
-        }
+        txBuilder = new TransactionBuilder(notary)
+                .addOutputState(outputState, wRDContract.ID)
+                .addCommand(new wRDContract.Commands.wRDCentralInitCommand(), Arrays.asList(kdr.getOwningKey()));
 
         // 3. Verify the transaction based on wRD Contract verify method (in current node)
         progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
@@ -102,7 +101,7 @@ public class wRDCentralInitFlow extends FlowLogic<SignedTransaction> {
         // Caveat: Note that in cases where states are being written to only a single party’s ledger and there’s no
         // counterparty, a notary does not need to be involved and the FinalityFlow step can be skipped.
         // However, calling FinalityFlow when there’s only one party involved in a state will result in a log message.
-         SignedTransaction finalTx = subFlow(new FinalityFlow(partSignedTx, sessions,
+        SignedTransaction finalTx = subFlow(new FinalityFlow(partSignedTx, sessions,
                 FINALISING_TRANSACTION.childProgressTracker()));
 
         // 7. Report to Observer for AML monitoring
