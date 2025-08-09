@@ -64,13 +64,13 @@ ssh user1@localhost -p 2221
 # Password: test
 ```
 
-### 1. wRDCentralInitFlow
+### [✅] 1. wRDCentralInitFlow
 Initialize KDR's central wallet with initial supply.
 ```bash
 flow start wRDCentralInitFlow initialAmount: "100000000000000 IDR"
 ```
 
-### 2. wRDIssuanceInitFlow (with walletId)
+### [✅] 2. wRDIssuanceInitFlow
 Issue wRD from KDR to wholesaler using specific source wallet.
 ```bash
 # First get the central wallet ID
@@ -80,10 +80,13 @@ run vaultQuery contractStateType: com.trace.states.wRDAccountState
 flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "10000000000 IDR", sourceWalletId: "a4dbb70a-6154-422b-a89f-8c8e5012235f"
 ```
 
-### 3. wRDIssuanceFlow (legacy)
+### [✅] 3. wRDIssuanceFlow
 Standard wRD issuance without walletId specification.
 ```bash
-flow start wRDIssuanceFlow receiver: "O=Wholesaler1,L=Jakarta,C=ID", amount: "10000000000 IDR"
+# First get the wholesaler wallet ID
+run vaultQuery contractStateType: com.trace.states.wRDAccountState
+# Then issue using walletId
+flow start wRDIssuanceFlow sourceWalletId: 46ade1f4-88f8-4577-9eda-20d0465cb673, receiverWalletId: 290b6675-e080-462c-9492-535805a118dc, amount: "10000000000 IDR"
 ```
 
 ### 4. wRDTransferFlow (with walletId)
