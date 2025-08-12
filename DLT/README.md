@@ -81,7 +81,7 @@ flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amoun
 ```
 
 ### [✅] 3. wRDIssuanceFlow
-Standard wRD issuance without walletId specification.
+Standard wRD issuance with walletId specification.
 ```bash
 # First get the wholesaler wallet ID
 run vaultQuery contractStateType: com.trace.states.wRDAccountState
