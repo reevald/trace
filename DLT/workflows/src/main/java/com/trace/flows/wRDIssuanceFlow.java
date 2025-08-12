@@ -93,29 +93,7 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         List<StateAndRef<wRDAccountState>> stateAndRefSourceWalletStates = new ArrayList<>();
         List<StateAndRef<wRDAccountState>> stateAndRefReceiverWalletStates = new ArrayList<>();
 
-        Party receiverParty = null;
-        // sourceWalletId (must be owned by KDR) & receiverWalletId (must be owned by non KDR)
-        boolean isSourceWalletIdOwnedByKDR = false;
-        for (StateAndRef<wRDAccountState> stateAndRef : stateAndRefOfSourceAndReceiverWalletStatesInSourceParty) {
-            if (stateAndRef.getState().getData().getOwner().equals(kdr)) {
-                isSourceWalletIdOwnedByKDR = true;
-                stateAndRefSourceWalletStates.add(stateAndRef);
-            } else {
-                receiverParty = stateAndRef.getState().getData().getOwner();
-                stateAndRefReceiverWalletStates.add(stateAndRef);
-            }
-        }
-
-        if (!isSourceWalletIdOwnedByKDR) {
-            throw new IllegalArgumentException("Source wallet state must be owned by source party (KDR)");
-        }
-
-        // TODO: Adjust this conditional check if implement multi node KDR
-        // We simplified this logic by assume only one KDR node, which is who initialize every wholesaler wallet.
-        // Therefore, every wholesaler (receiver) wallet state must be already stored in KDR node.
-        if (receiverParty == null) {
-            throw new FlowException("Receiver wallet state should be stored in source party (KDR)");
-        }
+        Party receiverParty = getReceiverParty(stateAndRefOfSourceAndReceiverWalletStatesInSourceParty, kdr);
 
         // 2. Gather source and receiver wallet states inside receiver party
         // Here why (common challenge in DLT): the receiver wallet state in source party not updated yet, we don't
@@ -188,6 +166,48 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         subFlow(new ReportToObserverFlow(finalTx));
 
         return finalTx;
+    }
+
+    @NotNull
+    private Party getReceiverParty(
+            List<StateAndRef<wRDAccountState>> stateAndRefOfSourceAndReceiverWalletStatesInSourceParty,
+            Party kdr) throws FlowException {
+        Party receiverParty = null;
+
+        boolean isSourceWalletStateExistInKDR = false;
+        boolean isSourceWalletStateOwnedByKDR = false;
+        boolean isReceiverWalletStateExistInKDR = false;
+        for (StateAndRef<wRDAccountState> stateAndRef : stateAndRefOfSourceAndReceiverWalletStatesInSourceParty) {
+            if (stateAndRef.getState().getData().getWalletId().equals(sourceWalletId)) {
+                isSourceWalletStateExistInKDR = true;
+                if (stateAndRef.getState().getData().getOwner().equals(kdr)) {
+                    isSourceWalletStateOwnedByKDR = true;
+                }
+            }
+            if (stateAndRef.getState().getData().getWalletId().equals(receiverWalletId)) {
+                isReceiverWalletStateExistInKDR = true;
+                if (stateAndRef.getState().getData().getOwner().equals(kdr)) {
+                    throw new IllegalArgumentException("Receiver wallet state must be owned by non-kdr party.");
+                }
+                receiverParty = stateAndRef.getState().getData().getOwner();
+            }
+        }
+
+        if (!isSourceWalletStateExistInKDR) {
+            throw new IllegalArgumentException("Source wallet state must be exist in source party (KDR)");
+        }
+
+        if (!isSourceWalletStateOwnedByKDR) {
+            throw new IllegalArgumentException("Source wallet state must be owned by source party (KDR)");
+        }
+
+        // TODO: Adjust this conditional check if implement multi node KDR
+        // We simplified this logic by assume only one KDR node, which is who initialize every wholesaler wallet.
+        // Therefore, every wholesaler (receiver) wallet state must be already stored in KDR node.
+        if (!isReceiverWalletStateExistInKDR || receiverParty == null) {
+            throw new FlowException("Receiver wallet state should be stored in source party (KDR)");
+        }
+        return receiverParty;
     }
 
     @NotNull
