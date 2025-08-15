@@ -11,7 +11,7 @@ import com.trace.states.wRDAccountState;
 
 import java.util.List;
 
-public class devUtilFlow {
+public class DevUtilFlow {
     @InitiatingFlow
     @StartableByRPC
     public static class QueryConsumedWRDAccountStateFlow extends FlowLogic<List<StateAndRef<wRDAccountState>>> {
