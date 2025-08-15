@@ -8,6 +8,7 @@ import net.corda.core.contracts.StateAndRef;
 import net.corda.core.contracts.UniqueIdentifier;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
+import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.core.node.services.Vault;
@@ -17,6 +18,8 @@ import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
 import org.jetbrains.annotations.NotNull;
 
+import java.security.PublicKey;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Currency;
 import java.util.List;
@@ -112,12 +115,18 @@ public class wRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
         final wRDAccountState kdrOutputState = inputState.withNewBalanceAndIssuer(remainingBalance, wholesaler);
         final wRDAccountState wholesalerOutputState = new wRDAccountState(wholesaler, kdr, "IDR", amount);
 
+        progressTracker.setCurrentStep(GENERATING_TRANSACTION);
+        List<PublicKey> listOfRequiredSigners = inputState.getParticipants()
+                .stream().map(AbstractParty::getOwningKey)
+                .collect(Collectors.toList());
+
+        listOfRequiredSigners.add(wholesaler.getOwningKey());
+
         final TransactionBuilder txBuilder = new TransactionBuilder(notary)
                 .addInputState(inputStateAndRef)
                 .addOutputState(kdrOutputState, wRDContract.ID)
                 .addOutputState(wholesalerOutputState, wRDContract.ID)
-                .addCommand(new wRDContract.Commands.wRDIssuanceInitCommand(),
-                        Arrays.asList(kdr.getOwningKey(), wholesaler.getOwningKey()));
+                .addCommand(new wRDContract.Commands.wRDIssuanceInitCommand(), listOfRequiredSigners);
 
         // 3. Verify the transaction based on wRD Contract verify method (in current node)
         progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
@@ -129,14 +138,21 @@ public class wRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
 
         // 5. Collect all the required signatures from other nodes
         progressTracker.setCurrentStep(GATHERING_SIGS);
-        FlowSession wholesalerSession = initiateFlow(wholesaler);
+        List<FlowSession> sessions = new ArrayList<>();
+        for (AbstractParty participant: inputState.getParticipants()) {
+            Party partyToInitiateFlow = (Party) participant;
+            if (!partyToInitiateFlow.getOwningKey().equals(getOurIdentity().getOwningKey())) {
+                sessions.add(initiateFlow(partyToInitiateFlow));
+            }
+        }
+        sessions.add(initiateFlow(wholesaler));
         SignedTransaction fullySignedTx = subFlow(new CollectSignaturesFlow(partSignedTx,
-                Arrays.asList(wholesalerSession), GATHERING_SIGS.childProgressTracker()));
+                sessions, GATHERING_SIGS.childProgressTracker()));
 
         // 6. Return the output of the FinalityFlow which sends the transaction to the notary for verification and
         // the causes it to be persisted to the vault of appropriate nodes.
         progressTracker.setCurrentStep(FINALISING_TRANSACTION);
-        SignedTransaction finalTx = subFlow(new FinalityFlow(fullySignedTx, Arrays.asList(wholesalerSession),
+        SignedTransaction finalTx = subFlow(new FinalityFlow(fullySignedTx, sessions,
                 FINALISING_TRANSACTION.childProgressTracker()));
 
         // 7. Report to Observer for AML monitoring
