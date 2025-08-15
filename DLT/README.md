@@ -67,32 +67,40 @@ ssh user1@localhost -p 2221
 ### [✅] 1. wRDCentralInitFlow
 Initialize KDR's central wallet with initial supply.
 ```bash
-flow start wRDCentralInitFlow initialAmount: "100000000000000 IDR"
+# [Start from KDR Node]
+flow start wRDCentralInitFlow initialAmount: "1000 IDR"
 ```
 
 ### [✅] 2. wRDIssuanceInitFlow
 Issue wRD from KDR to wholesaler using specific source wallet.
 ```bash
-# First get the central wallet ID
-run vaultQuery contractStateType: com.trace.states.wRDAccountState
+# [Start from KDR Node]
+flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "69 IDR", sourceWalletId: 
+"<walletId1>"
 
-# Then issue using walletId
-flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "10000000000 IDR", sourceWalletId: "a4dbb70a-6154-422b-a89f-8c8e5012235f"
+flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler2,L=Surabaya,C=ID", amount: "96 IDR", sourceWalletId: 
+"<walletId2>"
 ```
 
 ### [✅] 3. wRDIssuanceFlow
 Standard wRD issuance with walletId specification.
 ```bash
-# First get the wholesaler wallet ID
+# [Start from KDR Node]
+# Get walletId1 and walletId2
 run vaultQuery contractStateType: com.trace.states.wRDAccountState
-# Then issue using walletId
-flow start wRDIssuanceFlow sourceWalletId: 46ade1f4-88f8-4577-9eda-20d0465cb673, receiverWalletId: 290b6675-e080-462c-9492-535805a118dc, amount: "10000000000 IDR"
+
+flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId1>, amount: "11 IDR"
+
+flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId2>, amount: "4 IDR"
 ```
 
-### 4. wRDTransferFlow (with walletId)
+### [✅] 4. wRDTransferFlow
 Transfer wRD between wholesaler wallets.
 ```bash
-flow start wRDTransferFlow receiver: "O=Wholesaler2,L=Surabaya,C=ID", amount: "1000000000 IDR", sourceWalletId: "source-wallet-id", targetWalletId: "target-wallet-id"
+# [Start from Wholesaler 1 or 2]
+flow start wRDTransferFlow sourceWalletId: <walletId1>, receiverWalletId: <walletId2>, receiverWholesaler: "O=Wholesaler2,L=Surabaya,C=ID", amount: "30 IDR"
+
+flow start wRDTransferFlow sourceWalletId: <walletId2>, receiverWalletId: <walletId1>, receiverWholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "100 IDR"
 ```
 
 ### 5. wRD2rRDIssuanceInitFlow (with walletId)
