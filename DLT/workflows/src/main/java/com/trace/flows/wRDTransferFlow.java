@@ -4,7 +4,6 @@ import co.paralleluniverse.fibers.Suspendable;
 import com.trace.contracts.wRDContract;
 import com.trace.states.UtilAccountState;
 import com.trace.states.wRDAccountState;
-import jdk.jshell.execution.Util;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.contracts.UniqueIdentifier;
@@ -15,7 +14,6 @@ import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.core.node.services.Vault;
 import net.corda.core.node.services.vault.QueryCriteria;
-import net.corda.core.serialization.CordaSerializable;
 import net.corda.core.transactions.SignedTransaction;
 import net.corda.core.transactions.TransactionBuilder;
 import net.corda.core.utilities.ProgressTracker;
@@ -184,15 +182,15 @@ public class wRDTransferFlow extends FlowLogic<SignedTransaction> {
 
         txBuilder.addCommand(new wRDContract.Commands.wRDTransferCommand(), mergedListOfRequiredSigners);
 
-        // 4. Verify the transaction based on wRD Contract verify method (in current / source party)
+        // 5. Verify the transaction based on wRD Contract verify method (in current / source party)
         progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
         txBuilder.verify(getServiceHub());
 
-        // 5. Sign the transaction (in current / source party)
+        // 6. Sign the transaction (in current / source party)
         progressTracker.setCurrentStep(SIGNING_TRANSACTION);
         final SignedTransaction partSignedTx = getServiceHub().signInitialTransaction(txBuilder);
 
-        // 6. Collect all the required signatures from other nodes
+        // 7. Collect all the required signatures from other nodes
         // This CollectSignaturesFlow will trigger SignTransactionFlow in responder, that already called on step 2 above
         progressTracker.setCurrentStep(GATHERING_SIGS);
         List<FlowSession> sessions = new ArrayList<>();
@@ -220,13 +218,13 @@ public class wRDTransferFlow extends FlowLogic<SignedTransaction> {
         SignedTransaction fullySignedTx = subFlow(new CollectSignaturesFlow(partSignedTx,
                 sessions, GATHERING_SIGS.childProgressTracker()));
 
-        // 7. Return the output of the FinalityFlow which sends the transaction to the notary for verification and
+        // 8. Return the output of the FinalityFlow which sends the transaction to the notary for verification and
         // the causes it to be persisted to the vault of appropriate nodes.
         progressTracker.setCurrentStep(FINALISING_TRANSACTION);
         SignedTransaction finalTx = subFlow(new FinalityFlow(fullySignedTx, sessions,
                 FINALISING_TRANSACTION.childProgressTracker()));
 
-        // 8. Report to Observer for AML monitoring
+        // 9. Report to Observer for AML monitoring
         subFlow(new ReportToObserverFlow(finalTx));
 
         return finalTx;
