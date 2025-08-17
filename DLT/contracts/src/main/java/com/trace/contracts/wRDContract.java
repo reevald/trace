@@ -33,6 +33,8 @@ public class wRDContract implements Contract {
             verifyWRDIssuance(tx);
         } else if (commandData instanceof Commands.wRDTransferCommand) {
             verifyWRDTransfer(tx);
+        } else if (commandData instanceof Commands.wRDRedemptionCommand) {
+            verifyWRDRedemption(tx);
         } else {
             throw new IllegalArgumentException("Unrecognised command");
         }
@@ -157,14 +159,14 @@ public class wRDContract implements Contract {
             require.using("Last Modified receiverOutput must be before now",
                     receiverOutput.getLastModified().isBefore(Instant.now()));
 
-            // 17. Both source and receiver must sign wRDIssuanceInit transaction
+            // 17. All participants must sign wRDIssuanceInit transaction
             Set<PublicKey> listOfParticipantPublicKeys =
                     sourceInput.getParticipants().stream()
                             .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
             listOfParticipantPublicKeys.add(receiverOutput.getOwner().getOwningKey());
             List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
             Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
-            require.using("Both source and receiver must sign wRDIssuanceInit transaction",
+            require.using("All participants must sign wRDIssuanceInit transaction",
                     setOfSigners.equals(listOfParticipantPublicKeys));
 
             return null;
@@ -257,7 +259,7 @@ public class wRDContract implements Contract {
                             && inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getLastModified()
                             .isAfter(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getLastModified()));
 
-            // 14. Both source and receiver must sign wRDIssuance transaction
+            // 14. All participants must sign wRDIssuance transaction
             Set<PublicKey> listOfParticipantPublicKeys =
                     inputOutputStatesMap.get("INPUTS").get("SOURCE").getParticipants().stream()
                             .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
@@ -265,7 +267,7 @@ public class wRDContract implements Contract {
                     .map(AbstractParty::getOwningKey).collect(Collectors.toSet()));
             List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
             Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
-            require.using("Both source and receiver must sign wRDIssuance transaction",
+            require.using("All participants must sign wRDIssuance transaction",
                     setOfSigners.equals(listOfParticipantPublicKeys));
 
             return null;
@@ -286,14 +288,14 @@ public class wRDContract implements Contract {
             HashMap<String, HashMap<String, wRDAccountState>> inputOutputStatesMap = buildInputOutputMapWithAB(inputs
                     , outputs);
 
-            // 3. Source's owner must be KDR and must be equal between the input and output state
-            require.using("Source's owner in input state must be KDR",
+            // 3. Source's owner must be non-KDR and must be equal between the input and output state
+            require.using("Source's owner in input state must be non-KDR",
                     !isKDR(inputOutputStatesMap.get("INPUTS").get("SOURCE").getOwner()));
             require.using("Source's owner in input and output states must be equal",
                     inputOutputStatesMap.get("INPUTS").get("SOURCE").getOwner().equals(inputOutputStatesMap.get(
                             "OUTPUTS").get("SOURCE").getOwner()));
 
-            // 4. Receiver's owner must not be KDR and must be equal between the input and output state
+            // 4. Receiver's owner must be non-KDR and must be equal between the input and output state
             require.using("Receiver's owner in input state must be not KDR",
                     !isKDR(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getOwner()));
             require.using("Receiver's owner in input and output states must be equal",
@@ -359,7 +361,7 @@ public class wRDContract implements Contract {
                             && inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getLastModified()
                             .isAfter(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getLastModified()));
 
-            // 15. Both source and receiver must sign wRDIssuance transaction
+            // 15. All participants must sign wRDIssuance transaction
             Set<PublicKey> listOfParticipantPublicKeys =
                     inputOutputStatesMap.get("INPUTS").get("SOURCE").getParticipants().stream()
                             .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
@@ -367,7 +369,109 @@ public class wRDContract implements Contract {
                     .map(AbstractParty::getOwningKey).collect(Collectors.toSet()));
             List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
             Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
-            require.using("Both source and receiver must sign wRDIssuance transaction",
+            require.using("All participants must sign wRDIssuance transaction",
+                    setOfSigners.equals(listOfParticipantPublicKeys));
+
+            return null;
+        });
+    }
+
+    private void verifyWRDRedemption(LedgerTransaction tx) {
+        requireThat(require -> {
+            final List<wRDAccountState> inputs = tx.inputsOfType(wRDAccountState.class);
+            final List<wRDAccountState> outputs = tx.outputsOfType(wRDAccountState.class);
+
+            // 1. Two input states should be consumed
+            require.using("Two input states should be consumed", inputs.size() == 2);
+
+            // 2. Two output states should be consumed
+            require.using("Two output states should be created", outputs.size() == 2);
+
+            HashMap<String, HashMap<String, wRDAccountState>> inputOutputStatesMap = buildInputOutputMapWithAB(inputs
+                    , outputs);
+
+            // 3. Source's owner must be non-KDR and must be equal between the input and output state
+            require.using("Source's owner in input state must be KDR",
+                    !isKDR(inputOutputStatesMap.get("INPUTS").get("SOURCE").getOwner()));
+            require.using("Source's owner in input and output states must be equal",
+                    inputOutputStatesMap.get("INPUTS").get("SOURCE").getOwner().equals(inputOutputStatesMap.get(
+                            "OUTPUTS").get("SOURCE").getOwner()));
+
+            // 4. Receiver's owner must be KDR and must be equal between the input and output state
+            require.using("Receiver's owner in input state must be not KDR",
+                    isKDR(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getOwner()));
+            require.using("Receiver's owner in input and output states must be equal",
+                    inputOutputStatesMap.get("INPUTS").get("RECEIVER").getOwner().equals(inputOutputStatesMap.get(
+                            "OUTPUTS").get("RECEIVER").getOwner()));
+
+            // 5. Receiver owner must be not equal with the source owner
+            require.using("Receiver owner must be not equal with the source owner",
+                    !inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getOwner().equals(inputOutputStatesMap.get(
+                            "OUTPUTS").get("SOURCE").getOwner()));
+
+            // 6. Source issuer in output state must be equal to receiver owner in input state
+            require.using("Source's issuer in output state must be equal to receiver's owner",
+                    inputOutputStatesMap.get("OUTPUTS").get("SOURCE").getIssuer().equals(inputOutputStatesMap.get(
+                            "INPUTS").get("RECEIVER").getOwner()));
+
+            // 7. Receiver issuer in output state must be equal to source owner in input state
+            require.using("Receiver's issuer in output state must be equal to source's owner",
+                    inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getIssuer().equals(inputOutputStatesMap.get(
+                            "INPUTS").get("SOURCE").getOwner()));
+
+            Amount<Currency> transferAmount =
+                    inputOutputStatesMap.get("INPUTS").get("SOURCE").getTokenBalance()
+                            .minus(inputOutputStatesMap.get("OUTPUTS").get("SOURCE").getTokenBalance());
+
+            // 8. Transfer amount must be greater than 0
+            require.using("Transfer amount must be greater than 0", transferAmount.getQuantity() > 0);
+
+            // 9. Source must have sufficient balance
+            require.using("Source must have sufficient balance",
+                    inputOutputStatesMap.get("INPUTS").get("SOURCE").getTokenBalance().getQuantity()
+                            >= transferAmount.getQuantity());
+
+            // 10. Token type must be IDR
+            require.using("Source's token type in input state must be IDR",
+                    inputOutputStatesMap.get("INPUTS").get("SOURCE").getTokenType().equals("IDR"));
+            require.using("Receiver's token type in input state must be IDR",
+                    inputOutputStatesMap.get("INPUTS").get("RECEIVER").getTokenType().equals("IDR"));
+            require.using("Source's token type in output state must be IDR",
+                    inputOutputStatesMap.get("OUTPUTS").get("SOURCE").getTokenType().equals("IDR"));
+            require.using("Receiver's token type in output state must be IDR",
+                    inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getTokenType().equals("IDR"));
+
+            // 11. Version source in output state must be +1 of input state
+            require.using("Version source in output state must be +1 of input state",
+                    inputOutputStatesMap.get("OUTPUTS").get("SOURCE")
+                            .getVersion() == inputOutputStatesMap.get("INPUTS").get("SOURCE").getVersion() + 1);
+
+            // 12. Version receiver in output state must be +1 of input state
+            require.using("Version receiver in output state must be +1 of input state",
+                    inputOutputStatesMap.get("OUTPUTS").get("RECEIVER")
+                            .getVersion() == inputOutputStatesMap.get("INPUTS").get("RECEIVER").getVersion() + 1);
+
+            // 13. Last modified source in output state must be before now and after input state
+            require.using("Last modified source in output state must be before now and after input state",
+                    inputOutputStatesMap.get("OUTPUTS").get("SOURCE").getLastModified().isBefore(Instant.now())
+                            && inputOutputStatesMap.get("OUTPUTS").get("SOURCE").getLastModified()
+                            .isAfter(inputOutputStatesMap.get("INPUTS").get("SOURCE").getLastModified()));
+
+            // 14. Last modified receiver in output state must be before now and after input state
+            require.using("Last modified receiver in output state must be before now and after input state",
+                    inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getLastModified().isBefore(Instant.now())
+                            && inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getLastModified()
+                            .isAfter(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getLastModified()));
+
+            // 15. All participants must sign wRDIssuance transaction
+            Set<PublicKey> listOfParticipantPublicKeys =
+                    inputOutputStatesMap.get("INPUTS").get("SOURCE").getParticipants().stream()
+                            .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
+            listOfParticipantPublicKeys.addAll(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getParticipants().stream()
+                    .map(AbstractParty::getOwningKey).collect(Collectors.toSet()));
+            List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
+            Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
+            require.using("All participants must sign wRDIssuance transaction",
                     setOfSigners.equals(listOfParticipantPublicKeys));
 
             return null;
@@ -462,6 +566,9 @@ public class wRDContract implements Contract {
         }
 
         class wRDTransferCommand implements Commands {
+        }
+
+        class wRDRedemptionCommand implements Commands {
         }
     }
 }
