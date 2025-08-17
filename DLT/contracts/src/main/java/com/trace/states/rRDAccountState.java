@@ -19,9 +19,9 @@ import java.util.List;
 public class rRDAccountState implements LinearState {
     private final UniqueIdentifier walletId;
     private final String walletType;
-    private final String owner;
+    private final UniqueIdentifier ownerId;
     private final Party ownerWholesaler;
-    private final String issuer;
+    private final UniqueIdentifier issuerId;
     private final Party issuerWholesaler;
     private final String tokenType;
     private final Amount<Currency> tokenBalance;
@@ -29,14 +29,14 @@ public class rRDAccountState implements LinearState {
     private final Instant lastModified;
 
     @ConstructorForDeserialization
-    public rRDAccountState(UniqueIdentifier walletId, String walletType, String owner, Party ownerWholesaler,
-                           String issuer, Party issuerWholesaler, String tokenType, Amount<Currency> tokenBalance,
+    public rRDAccountState(UniqueIdentifier walletId, String walletType, UniqueIdentifier ownerId, Party ownerWholesaler,
+                           UniqueIdentifier issuerId, Party issuerWholesaler, String tokenType, Amount<Currency> tokenBalance,
                            long version, Instant lastModified) {
         this.walletId = walletId;
         this.walletType = walletType;
-        this.owner = owner;
+        this.ownerId = ownerId;
         this.ownerWholesaler = ownerWholesaler;
-        this.issuer = issuer;
+        this.issuerId = issuerId;
         this.issuerWholesaler = issuerWholesaler;
         this.tokenType = tokenType;
         this.tokenBalance = tokenBalance;
@@ -44,13 +44,13 @@ public class rRDAccountState implements LinearState {
         this.lastModified = lastModified;
     }
 
-    public rRDAccountState(String walletType, String owner, Party ownerWholesaler, String issuer,
+    public rRDAccountState(String walletType, UniqueIdentifier ownerId, Party ownerWholesaler, UniqueIdentifier issuerId,
                            Party issuerWholesaler, String tokenType, Amount<Currency> tokenBalance) {
         this.walletId = new UniqueIdentifier();
         this.walletType = walletType;
-        this.owner = owner;
+        this.ownerId = ownerId;
         this.ownerWholesaler = ownerWholesaler;
-        this.issuer = issuer;
+        this.issuerId = issuerId;
         this.issuerWholesaler = issuerWholesaler;
         this.tokenType = tokenType;
         this.tokenBalance = tokenBalance;
@@ -78,16 +78,16 @@ public class rRDAccountState implements LinearState {
         return walletType;
     }
 
-    public String getOwner() {
-        return owner;
+    public UniqueIdentifier getOwnerId() {
+        return ownerId;
     }
 
     public Party getOwnerWholesaler() {
         return ownerWholesaler;
     }
 
-    public String getIssuer() {
-        return issuer;
+    public UniqueIdentifier getIssuerId() {
+        return issuerId;
     }
 
     public Party getIssuerWholesaler() {
@@ -110,8 +110,9 @@ public class rRDAccountState implements LinearState {
         return lastModified;
     }
 
-    public rRDAccountState withNewBalanceAndIssuer(Amount<Currency> newBalance, String issuer, Party issuerWholesaler) {
-        return new rRDAccountState(this.walletId, this.walletType, this.owner, this.ownerWholesaler, issuer,
+    public rRDAccountState withNewBalanceAndIssuer(Amount<Currency> newBalance, UniqueIdentifier issuerId,
+                                                   Party issuerWholesaler) {
+        return new rRDAccountState(this.walletId, this.walletType, this.ownerId, this.ownerWholesaler, issuerId,
                 issuerWholesaler, this.tokenType, newBalance, this.version + 1, Instant.now());
     }
 
