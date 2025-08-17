@@ -103,52 +103,55 @@ flow start wRDTransferFlow sourceWalletId: <walletId1>, receiverWalletId: <walle
 flow start wRDTransferFlow sourceWalletId: <walletId2>, receiverWalletId: <walletId1>, receiverWholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "100 IDR"
 ```
 
-### 5. wRD2rRDIssuanceInitFlow (with walletId)
-Convert wRD to rRD for peritel operations.
-```bash
-flow start wRD2rRDIssuanceInitFlow amount: "5000000000 IDR", sourceWalletId: "wrd-wallet-id", targetWalletId: "rrd-peritel-wallet-id"
-```
-
-### 6. wRD2rRDIssuanceFlow (legacy)
-Standard wRD to rRD conversion using owner string.
-```bash
-flow start wRD2rRDIssuanceFlow amount: "5000000000 IDR", peritelOwner: "Wholesaler1-P-peritel-001"
-```
-
-### 7. rRDIssuanceInitFlow (with walletId)
-Issue rRD from peritel to retail wallets.
-```bash
-flow start rRDIssuanceInitFlow amount: "1000000000 IDR", sourceWalletId: "peritel-wallet-id", targetWalletId: "retail-wallet-id"
-```
-
-### 8. rRDIssuanceFlow (legacy)
-Standard rRD issuance using owner string.
-```bash
-flow start rRDIssuanceFlow amount: "1000000000 IDR", retailOwner: "Wholesaler1-R-retail-001"
-```
-
-### 9. rRDTransferFlow
-Transfer rRD between retail users.
-```bash
-flow start rRDTransferFlow receiverOwner: "Wholesaler1-R-retail-002", amount: "500000000 IDR"
-```
-
-### 10. wRDRedemptionFlow (with walletId)
+### [✅] 5. wRDRedemptionFlow
 Redeem wRD back to KDR.
 ```bash
-flow start wRDRedemptionFlow kdr: "O=KDR,L=Jakarta,C=ID", amount: "2000000000 IDR", sourceWalletId: "wholesaler-wallet-id", targetWalletId: "kdr-wallet-id"
+# [Start from Wholesaler 1 or 2]
+flow start wRDRedemptionFlow sourceWalletId: <walletId1>, receiverWalletId: <kdrWalletId>, amount: "100 IDR"
+
+flow start wRDRedemptionFlow sourceWalletId: <walletId2>, receiverWalletId: <kdrWalletId>, amount: "10 IDR"
+```
+
+### 6. wRD2rRDIssuanceInitFlow
+Convert wRD to rRD for peritel operations.
+```bash
+TODO
+```
+
+### 7. wRD2rRDIssuanceFlow
+Standard wRD to rRD conversion using owner string.
+```bash
+TODO
+```
+
+### 8. rRDIssuanceInitFlow (with walletId)
+Issue rRD from peritel to retail wallets.
+```bash
+TODO
+```
+
+### 9. rRDIssuanceFlow (legacy)
+Standard rRD issuance using owner string.
+```bash
+TODO
+```
+
+### 10. rRDTransferFlow
+Transfer rRD between retail users.
+```bash
+TODO
 ```
 
 ### 11. rRD2wRDRedemptionFlow (with walletId)
 Convert rRD back to wRD.
 ```bash
-flow start rRD2wRDRedemptionFlow amount: "1000000000 IDR", sourceWalletId: "rrd-wallet-id", targetWalletId: "wrd-wallet-id"
+TODO
 ```
 
 ### 12. rRDRedemptionFlow (legacy)
 Redeem rRD using owner string.
 ```bash
-flow start rRDRedemptionFlow amount: "500000000 IDR", retailOwner: "Wholesaler1-R-retail-001"
+TODO
 ```
 
 ## Vault Query Commands
