@@ -1,5 +1,6 @@
 package com.trace.contracts;
 
+import com.trace.states.rRDAccountState;
 import com.trace.states.wRDAccountState;
 import net.corda.core.contracts.*;
 import net.corda.core.identity.AbstractParty;
@@ -14,8 +15,8 @@ import java.util.stream.Collectors;
 
 import static net.corda.core.contracts.ContractsDSL.requireThat;
 
-public class wRDContract implements Contract {
-    public static final String ID = "com.trace.contracts.wRDContract";
+public class RDContract implements Contract {
+    public static final String ID = "com.trace.contracts.RDContract";
 
     @Override
     public void verify(@NotNull LedgerTransaction tx) {
@@ -35,6 +36,8 @@ public class wRDContract implements Contract {
             verifyWRDTransfer(tx);
         } else if (commandData instanceof Commands.wRDRedemptionCommand) {
             verifyWRDRedemption(tx);
+        } else if (commandData instanceof Commands.wRD2rRDIssuanceInitCommand) {
+            verifyWRD2RRDIssuanceInit(tx);
         } else {
             throw new IllegalArgumentException("Unrecognised command");
         }
@@ -137,25 +140,29 @@ public class wRDContract implements Contract {
             require.using("Source must have sufficient balance",
                     sourceInput.getTokenBalance().getQuantity() >= transferAmount.getQuantity());
 
-            // 11. Token type must be IDR
+            // 11. Receiver token balance must be equal with transfer amount
+            require.using("Receiver token balance must be equal with transfer amount",
+                    receiverOutput.getTokenBalance().getQuantity() == transferAmount.getQuantity());
+
+            // 12. Token type must be IDR
             require.using("Source's token type in input state must be IDR", sourceInput.getTokenType().equals("IDR"));
             require.using("Source's token type in output state must be IDR", sourceOutput.getTokenType().equals("IDR"));
             require.using("Receiver's token type in output state must be IDR", receiverOutput.getTokenType().equals(
                     "IDR"));
 
-            // 12. Version source in output state must be +1 of source in input state
+            // 13. Version source in output state must be +1 of source in input state
             require.using("Version source in output state must be +1 of source in input state",
                     sourceOutput.getVersion() == sourceInput.getVersion() + 1);
 
-            // 13. Version receiver in output state must be greater than 0
+            // 14. Version receiver in output state must be greater than 0
             require.using("Version receiver in output state must be greater than 0", receiverOutput.getVersion() > 0);
 
-            // 14. Last modified source in output state must be before now and after source in input state
+            // 15. Last modified source in output state must be before now and after source in input state
             require.using("Last modified source in output state must be before now and after source in input state",
                     sourceOutput.getLastModified().isBefore(Instant.now()) &&
                             sourceOutput.getLastModified().isAfter(sourceInput.getLastModified()));
 
-            // 15. Last Modified receiver in output state must be before now
+            // 16. Last Modified receiver in output state must be before now
             require.using("Last Modified receiverOutput must be before now",
                     receiverOutput.getLastModified().isBefore(Instant.now()));
 
@@ -361,7 +368,7 @@ public class wRDContract implements Contract {
                             && inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getLastModified()
                             .isAfter(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getLastModified()));
 
-            // 15. All participants must sign wRDIssuance transaction
+            // 15. All participants must sign wRDTransfer transaction
             Set<PublicKey> listOfParticipantPublicKeys =
                     inputOutputStatesMap.get("INPUTS").get("SOURCE").getParticipants().stream()
                             .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
@@ -369,7 +376,7 @@ public class wRDContract implements Contract {
                     .map(AbstractParty::getOwningKey).collect(Collectors.toSet()));
             List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
             Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
-            require.using("All participants must sign wRDIssuance transaction",
+            require.using("All participants must sign wRDTransfer transaction",
                     setOfSigners.equals(listOfParticipantPublicKeys));
 
             return null;
@@ -463,7 +470,7 @@ public class wRDContract implements Contract {
                             && inputOutputStatesMap.get("OUTPUTS").get("RECEIVER").getLastModified()
                             .isAfter(inputOutputStatesMap.get("INPUTS").get("RECEIVER").getLastModified()));
 
-            // 15. All participants must sign wRDIssuance transaction
+            // 15. All participants must sign wRDRedemption transaction
             Set<PublicKey> listOfParticipantPublicKeys =
                     inputOutputStatesMap.get("INPUTS").get("SOURCE").getParticipants().stream()
                             .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
@@ -471,7 +478,97 @@ public class wRDContract implements Contract {
                     .map(AbstractParty::getOwningKey).collect(Collectors.toSet()));
             List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
             Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
-            require.using("All participants must sign wRDIssuance transaction",
+            require.using("All participants must sign wRDRedemption transaction",
+                    setOfSigners.equals(listOfParticipantPublicKeys));
+
+            return null;
+        });
+    }
+
+    private void verifyWRD2RRDIssuanceInit(LedgerTransaction tx) {
+        requireThat(require -> {
+            final List<wRDAccountState> inputWRDs = tx.inputsOfType(wRDAccountState.class);
+            final List<wRDAccountState> outputWRDs = tx.outputsOfType(wRDAccountState.class);
+            final List<rRDAccountState> outputRRDs = tx.outputsOfType(rRDAccountState.class);
+
+            // 1. One input wRDAccountState should be consumed
+            require.using("One input wRDAccountState should be consumed", inputWRDs.size() == 1);
+
+            // 2. One output wRDAccountState should be created
+            require.using("One output wRDAccountState should be created", outputWRDs.size() == 1);
+
+            // 3. One output rRDAccountState should be created
+            require.using("One output rRDAccountState should be created", outputRRDs.size() == 1);
+
+            wRDAccountState sourceInputWRD = inputWRDs.get(0);
+            wRDAccountState sourceOutputWRD = outputWRDs.get(0);
+            rRDAccountState receiverOutputRRD = outputRRDs.get(0);
+
+            // 4. Wallet id of receiverOutputRRD must be not null and generated along with the external id
+            require.using("Wallet id of receiverOutputRRD must be not null", receiverOutputRRD.getWalletId().getExternalId() != null);
+            require.using(" Wallet id of receiverOutputRRD must be generated along with the external id",
+                    receiverOutputRRD.getWalletId().getExternalId().equals(receiverOutputRRD.getOwnerExternalId()));
+
+            // 5. Source's owner must be non KDR
+            require.using("Source's owner in input wRDAccountState must be non KDR", !isKDR(sourceInputWRD.getOwner()));
+            require.using("Source's owner in output wRDAccountState must be non KDR",
+                    !isKDR(sourceOutputWRD.getOwner()));
+
+            // 6. Receiver's owner (wholesaler) must be non KDR
+            require.using("Receiver's owner (wholesaler) must be non KDR",
+                    !isKDR(receiverOutputRRD.getOwnerWholesaler()));
+
+            // 7. Source issuer in output wRDAccountState must be equal to receiver owner & issuer (wholesaler) in
+            // output rRDAccountState
+            require.using("Source issuer in output wRDAccountState must be equal to receiver owner (wholesaler) in " +
+                            "output rRDAccountState",
+                    sourceOutputWRD.getIssuer().equals(receiverOutputRRD.getOwnerWholesaler()));
+            require.using("Source issuer in output wRDAccountState must be equal to receiver issuer (wholesaler) in " +
+                            "output rRDAccountState",
+                    sourceOutputWRD.getIssuer().equals(receiverOutputRRD.getIssuerWholesaler()));
+
+            Amount<Currency> transferAmount = sourceInputWRD.getTokenBalance().minus(sourceOutputWRD.getTokenBalance());
+
+            // 8. Transfer amount must be greater than 0
+            require.using("Transfer amount must be greater than 0", transferAmount.getQuantity() > 0);
+
+            // 9. Source must have sufficient balance (note: overlap with previous check)
+            require.using("Source must have sufficient balance",
+                    sourceInputWRD.getTokenBalance().getQuantity() >= transferAmount.getQuantity());
+
+            // 10. Receiver token balance must be equal with transfer amount
+            require.using("Receiver token balance must be equal with transfer amount",
+                    receiverOutputRRD.getTokenBalance().getQuantity() == transferAmount.getQuantity());
+
+            // 11. Token type must be IDR
+            require.using("Source's wRD token type in input must be IDR", sourceInputWRD.getTokenType().equals("IDR"));
+            require.using("Source's wRD token type in output must be IDR", sourceOutputWRD.getTokenType().equals("IDR"));
+            require.using("Receiver's rRD token type in output must be IDR", receiverOutputRRD.getTokenType().equals(
+                    "IDR"));
+
+            // 12. Version source in output state must be +1 of source in input state
+            require.using("Version source in output state must be +1 of source in input state",
+                    sourceOutputWRD.getVersion() == sourceInputWRD.getVersion() + 1);
+
+            // 13. Version receiver in output state must be greater than 0
+            require.using("Version receiver in output state must be greater than 0", receiverOutputRRD.getVersion() > 0);
+
+            // 14. Last modified source in output state must be before now and after source in input state
+            require.using("Last modified source in output state must be before now and after source in input state",
+                    sourceOutputWRD.getLastModified().isBefore(Instant.now()) &&
+                            sourceOutputWRD.getLastModified().isAfter(sourceInputWRD.getLastModified()));
+
+            // 15. Last Modified receiver in output state must be before now
+            require.using("Last Modified receiver in output state must be before now",
+                    receiverOutputRRD.getLastModified().isBefore(Instant.now()));
+
+            // 16. All participants must sign wRD2rRDIssuanceInit transaction
+            Set<PublicKey> listOfParticipantPublicKeys =
+                    sourceInputWRD.getParticipants().stream()
+                            .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
+            List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
+            Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
+            require.using("All participants must sign wRD2rRDIssuanceInit transaction",
                     setOfSigners.equals(listOfParticipantPublicKeys));
 
             return null;
@@ -569,6 +666,9 @@ public class wRDContract implements Contract {
         }
 
         class wRDRedemptionCommand implements Commands {
+        }
+
+        class wRD2rRDIssuanceInitCommand implements Commands {
         }
     }
 }
