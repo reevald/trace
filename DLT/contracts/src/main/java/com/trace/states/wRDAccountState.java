@@ -1,6 +1,6 @@
 package com.trace.states;
 
-import com.trace.contracts.wRDContract;
+import com.trace.contracts.RDContract;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.BelongsToContract;
 import net.corda.core.contracts.LinearState;
@@ -15,7 +15,7 @@ import java.util.Arrays;
 import java.util.Currency;
 import java.util.List;
 
-@BelongsToContract(wRDContract.class)
+@BelongsToContract(RDContract.class)
 public class wRDAccountState implements LinearState {
     private final UniqueIdentifier walletId;
     private final Party owner;
@@ -89,6 +89,14 @@ public class wRDAccountState implements LinearState {
 
     public wRDAccountState withNewBalanceAndIssuer(Amount<Currency> newBalance, Party newIssuer) {
         return new wRDAccountState(this.walletId, this.owner, newIssuer, this.tokenType, newBalance, this.version + 1,
+                Instant.now());
+    }
+
+    // This method used for "issuance" in single node while keep existing participants (proper reconciliation)
+    // To fix: transaction failure due to discrepancies txHash of wRDAccountState (unconsumed) between nodes
+    // Target flow: wRD2rRDIssuanceInit (retailer) and rRDIssuanceInit (retail)
+    public wRDAccountState withNewBalance(Amount<Currency> newBalance) {
+        return new wRDAccountState(this.walletId, this.owner, this.issuer, this.tokenType, newBalance, this.version + 1,
                 Instant.now());
     }
 }

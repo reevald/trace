@@ -1,6 +1,6 @@
 package com.trace.states;
 
-import com.trace.contracts.rRDContract;
+import com.trace.contracts.RDContract;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.BelongsToContract;
 import net.corda.core.contracts.LinearState;
@@ -15,13 +15,13 @@ import java.util.Arrays;
 import java.util.Currency;
 import java.util.List;
 
-@BelongsToContract(rRDContract.class)
+@BelongsToContract(RDContract.class)
 public class rRDAccountState implements LinearState {
     private final UniqueIdentifier walletId;
     private final String walletType;
-    private final UniqueIdentifier ownerId;
+    private final String ownerExternalId;
     private final Party ownerWholesaler;
-    private final UniqueIdentifier issuerId;
+    private final String issuerExternalId;
     private final Party issuerWholesaler;
     private final String tokenType;
     private final Amount<Currency> tokenBalance;
@@ -29,14 +29,15 @@ public class rRDAccountState implements LinearState {
     private final Instant lastModified;
 
     @ConstructorForDeserialization
-    public rRDAccountState(UniqueIdentifier walletId, String walletType, UniqueIdentifier ownerId, Party ownerWholesaler,
-                           UniqueIdentifier issuerId, Party issuerWholesaler, String tokenType, Amount<Currency> tokenBalance,
+    public rRDAccountState(UniqueIdentifier walletId, String walletType, String ownerExternalId, Party ownerWholesaler,
+                           String issuerExternalId, Party issuerWholesaler, String tokenType,
+                           Amount<Currency> tokenBalance,
                            long version, Instant lastModified) {
         this.walletId = walletId;
         this.walletType = walletType;
-        this.ownerId = ownerId;
+        this.ownerExternalId = ownerExternalId;
         this.ownerWholesaler = ownerWholesaler;
-        this.issuerId = issuerId;
+        this.issuerExternalId = issuerExternalId;
         this.issuerWholesaler = issuerWholesaler;
         this.tokenType = tokenType;
         this.tokenBalance = tokenBalance;
@@ -44,13 +45,13 @@ public class rRDAccountState implements LinearState {
         this.lastModified = lastModified;
     }
 
-    public rRDAccountState(String walletType, UniqueIdentifier ownerId, Party ownerWholesaler, UniqueIdentifier issuerId,
+    public rRDAccountState(String walletType, String ownerExternalId, Party ownerWholesaler, String issuerExternalId,
                            Party issuerWholesaler, String tokenType, Amount<Currency> tokenBalance) {
-        this.walletId = new UniqueIdentifier();
+        this.walletId = new UniqueIdentifier(ownerExternalId);
         this.walletType = walletType;
-        this.ownerId = ownerId;
+        this.ownerExternalId = ownerExternalId;
         this.ownerWholesaler = ownerWholesaler;
-        this.issuerId = issuerId;
+        this.issuerExternalId = issuerExternalId;
         this.issuerWholesaler = issuerWholesaler;
         this.tokenType = tokenType;
         this.tokenBalance = tokenBalance;
@@ -78,16 +79,16 @@ public class rRDAccountState implements LinearState {
         return walletType;
     }
 
-    public UniqueIdentifier getOwnerId() {
-        return ownerId;
+    public String getOwnerExternalId() {
+        return ownerExternalId;
     }
 
     public Party getOwnerWholesaler() {
         return ownerWholesaler;
     }
 
-    public UniqueIdentifier getIssuerId() {
-        return issuerId;
+    public String getIssuerId() {
+        return issuerExternalId;
     }
 
     public Party getIssuerWholesaler() {
@@ -110,10 +111,10 @@ public class rRDAccountState implements LinearState {
         return lastModified;
     }
 
-    public rRDAccountState withNewBalanceAndIssuer(Amount<Currency> newBalance, UniqueIdentifier issuerId,
+    public rRDAccountState withNewBalanceAndIssuer(Amount<Currency> newBalance, String issuerExternalId,
                                                    Party issuerWholesaler) {
-        return new rRDAccountState(this.walletId, this.walletType, this.ownerId, this.ownerWholesaler, issuerId,
-                issuerWholesaler, this.tokenType, newBalance, this.version + 1, Instant.now());
+        return new rRDAccountState(this.walletId, this.walletType, this.ownerExternalId, this.ownerWholesaler,
+                issuerExternalId, issuerWholesaler, this.tokenType, newBalance, this.version + 1, Instant.now());
     }
 
     public boolean isRetailer() {

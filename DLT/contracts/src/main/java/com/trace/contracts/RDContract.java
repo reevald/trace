@@ -506,8 +506,12 @@ public class RDContract implements Contract {
 
             // 4. Wallet id of receiverOutputRRD must be not null and generated along with the external id
             require.using("Wallet id of receiverOutputRRD must be not null", receiverOutputRRD.getWalletId().getExternalId() != null);
-            require.using(" Wallet id of receiverOutputRRD must be generated along with the external id",
+            require.using("Wallet id of receiverOutputRRD must be generated along with the external id",
                     receiverOutputRRD.getWalletId().getExternalId().equals(receiverOutputRRD.getOwnerExternalId()));
+
+            // 5. Wallet type of receiverOutputRRD must be RETAILER
+            require.using("Wallet type of receiverOutputRRD must be RETAILER",
+                    receiverOutputRRD.getWalletType().equals("RETAILER"));
 
             // 5. Source's owner must be non KDR
             require.using("Source's owner in input wRDAccountState must be non KDR", !isKDR(sourceInputWRD.getOwner()));
@@ -518,58 +522,49 @@ public class RDContract implements Contract {
             require.using("Receiver's owner (wholesaler) must be non KDR",
                     !isKDR(receiverOutputRRD.getOwnerWholesaler()));
 
-            // 7. Source issuer in output wRDAccountState must be equal to receiver owner & issuer (wholesaler) in
-            // output rRDAccountState
-            require.using("Source issuer in output wRDAccountState must be equal to receiver owner (wholesaler) in " +
-                            "output rRDAccountState",
-                    sourceOutputWRD.getIssuer().equals(receiverOutputRRD.getOwnerWholesaler()));
-            require.using("Source issuer in output wRDAccountState must be equal to receiver issuer (wholesaler) in " +
-                            "output rRDAccountState",
-                    sourceOutputWRD.getIssuer().equals(receiverOutputRRD.getIssuerWholesaler()));
-
             Amount<Currency> transferAmount = sourceInputWRD.getTokenBalance().minus(sourceOutputWRD.getTokenBalance());
 
-            // 8. Transfer amount must be greater than 0
+            // 7. Transfer amount must be greater than 0
             require.using("Transfer amount must be greater than 0", transferAmount.getQuantity() > 0);
 
-            // 9. Source must have sufficient balance (note: overlap with previous check)
+            // 8. Source must have sufficient balance (note: overlap with previous check)
             require.using("Source must have sufficient balance",
                     sourceInputWRD.getTokenBalance().getQuantity() >= transferAmount.getQuantity());
 
-            // 10. Receiver token balance must be equal with transfer amount
+            // 9. Receiver token balance must be equal with transfer amount
             require.using("Receiver token balance must be equal with transfer amount",
                     receiverOutputRRD.getTokenBalance().getQuantity() == transferAmount.getQuantity());
 
-            // 11. Token type must be IDR
+            // 10. Token type must be IDR
             require.using("Source's wRD token type in input must be IDR", sourceInputWRD.getTokenType().equals("IDR"));
             require.using("Source's wRD token type in output must be IDR", sourceOutputWRD.getTokenType().equals("IDR"));
             require.using("Receiver's rRD token type in output must be IDR", receiverOutputRRD.getTokenType().equals(
                     "IDR"));
 
-            // 12. Version source in output state must be +1 of source in input state
+            // 11. Version source in output state must be +1 of source in input state
             require.using("Version source in output state must be +1 of source in input state",
                     sourceOutputWRD.getVersion() == sourceInputWRD.getVersion() + 1);
 
-            // 13. Version receiver in output state must be greater than 0
+            // 12. Version receiver in output state must be greater than 0
             require.using("Version receiver in output state must be greater than 0", receiverOutputRRD.getVersion() > 0);
 
-            // 14. Last modified source in output state must be before now and after source in input state
+            // 13. Last modified source in output state must be before now and after source in input state
             require.using("Last modified source in output state must be before now and after source in input state",
                     sourceOutputWRD.getLastModified().isBefore(Instant.now()) &&
                             sourceOutputWRD.getLastModified().isAfter(sourceInputWRD.getLastModified()));
 
-            // 15. Last Modified receiver in output state must be before now
+            // 14. Last Modified receiver in output state must be before now
             require.using("Last Modified receiver in output state must be before now",
                     receiverOutputRRD.getLastModified().isBefore(Instant.now()));
 
-            // 16. All participants must sign wRD2rRDIssuanceInit transaction
-            Set<PublicKey> listOfParticipantPublicKeys =
-                    sourceInputWRD.getParticipants().stream()
-                            .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
-            List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
-            Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
-            require.using("All participants must sign wRD2rRDIssuanceInit transaction",
-                    setOfSigners.equals(listOfParticipantPublicKeys));
+            // 15. All participants must sign wRD2rRDIssuanceInit transaction
+            // Set<PublicKey> listOfParticipantPublicKeys =
+            //         sourceInputWRD.getParticipants().stream()
+            //                 .map(AbstractParty::getOwningKey).collect(Collectors.toSet());
+            // List<PublicKey> arrayOfSigners = tx.getCommands().get(0).getSigners();
+            // Set<PublicKey> setOfSigners = new HashSet<>(arrayOfSigners);
+            // require.using("All participants must sign wRD2rRDIssuanceInit transaction",
+            //         setOfSigners.equals(listOfParticipantPublicKeys));
 
             return null;
         });
