@@ -64,80 +64,99 @@ ssh user1@localhost -p 2221
 # Password: test
 ```
 
-### 1. wRDCentralInitFlow
+### [✅] 1. wRDCentralInitFlow
 Initialize KDR's central wallet with initial supply.
 ```bash
-flow start wRDCentralInitFlow initialAmount: "100000000000000 IDR"
+# [Start from KDR Node]
+flow start wRDCentralInitFlow initialAmount: "1000 IDR"
 ```
 
-### 2. wRDIssuanceInitFlow (with walletId)
+### [✅] 2. wRDIssuanceInitFlow
 Issue wRD from KDR to wholesaler using specific source wallet.
 ```bash
-# First get the central wallet ID
+# [Start from KDR Node]
+flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "69 IDR", sourceWalletId: 
+"<walletId1>"
+
+flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler2,L=Surabaya,C=ID", amount: "96 IDR", sourceWalletId: 
+"<walletId2>"
+```
+
+### [✅] 3. wRDIssuanceFlow
+Standard wRD issuance with walletId specification.
+```bash
+# [Start from KDR Node]
+# Get walletId1 and walletId2
 run vaultQuery contractStateType: com.trace.states.wRDAccountState
 
-# Then issue using walletId
-flow start wRDIssuanceInitFlow wholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "10000000000 IDR", sourceWalletId: "a4dbb70a-6154-422b-a89f-8c8e5012235f"
+flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId1>, receiverWholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "11 IDR"
+
+flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId2>, receiverWholesaler: "O=Wholesaler2,L=Surabaya,C=ID", amount: "4 IDR"
 ```
 
-### 3. wRDIssuanceFlow (legacy)
-Standard wRD issuance without walletId specification.
-```bash
-flow start wRDIssuanceFlow receiver: "O=Wholesaler1,L=Jakarta,C=ID", amount: "10000000000 IDR"
-```
-
-### 4. wRDTransferFlow (with walletId)
+### [✅] 4. wRDTransferFlow
 Transfer wRD between wholesaler wallets.
 ```bash
-flow start wRDTransferFlow receiver: "O=Wholesaler2,L=Surabaya,C=ID", amount: "1000000000 IDR", sourceWalletId: "source-wallet-id", targetWalletId: "target-wallet-id"
+# [Start from Wholesaler 1 or 2]
+flow start wRDTransferFlow sourceWalletId: <walletId1>, receiverWalletId: <walletId2>, receiverWholesaler: "O=Wholesaler2,L=Surabaya,C=ID", amount: "30 IDR"
+
+flow start wRDTransferFlow sourceWalletId: <walletId2>, receiverWalletId: <walletId1>, receiverWholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "100 IDR"
 ```
 
-### 5. wRD2rRDIssuanceInitFlow (with walletId)
-Convert wRD to rRD for peritel operations.
-```bash
-flow start wRD2rRDIssuanceInitFlow amount: "5000000000 IDR", sourceWalletId: "wrd-wallet-id", targetWalletId: "rrd-peritel-wallet-id"
-```
-
-### 6. wRD2rRDIssuanceFlow (legacy)
-Standard wRD to rRD conversion using owner string.
-```bash
-flow start wRD2rRDIssuanceFlow amount: "5000000000 IDR", peritelOwner: "Wholesaler1-P-peritel-001"
-```
-
-### 7. rRDIssuanceInitFlow (with walletId)
-Issue rRD from peritel to retail wallets.
-```bash
-flow start rRDIssuanceInitFlow amount: "1000000000 IDR", sourceWalletId: "peritel-wallet-id", targetWalletId: "retail-wallet-id"
-```
-
-### 8. rRDIssuanceFlow (legacy)
-Standard rRD issuance using owner string.
-```bash
-flow start rRDIssuanceFlow amount: "1000000000 IDR", retailOwner: "Wholesaler1-R-retail-001"
-```
-
-### 9. rRDTransferFlow
-Transfer rRD between retail users.
-```bash
-flow start rRDTransferFlow receiverOwner: "Wholesaler1-R-retail-002", amount: "500000000 IDR"
-```
-
-### 10. wRDRedemptionFlow (with walletId)
+### [✅] 5. wRDRedemptionFlow
 Redeem wRD back to KDR.
 ```bash
-flow start wRDRedemptionFlow kdr: "O=KDR,L=Jakarta,C=ID", amount: "2000000000 IDR", sourceWalletId: "wholesaler-wallet-id", targetWalletId: "kdr-wallet-id"
+# [Start from Wholesaler 1 or 2]
+flow start wRDRedemptionFlow sourceWalletId: <walletId1>, receiverWalletId: <kdrWalletId>, amount: "100 IDR"
+
+flow start wRDRedemptionFlow sourceWalletId: <walletId2>, receiverWalletId: <kdrWalletId>, amount: "10 IDR"
+```
+
+### [✅] 6. wRD2rRDIssuanceInitFlow
+Convert wRD to rRD for peritel operations.
+```bash
+# [Start from Wholesaler 1 or 2]
+flow start wRD2rRDIssuanceInitFlow sourceWRDWalletId: <wrdWalletId1>, ownerExternalId: wh1-rtr-01, initialAmount: "15 
+IDR"
+
+flow start wRD2rRDIssuanceInitFlow sourceWRDWalletId: <wrdWalletId2>, ownerExternalId: wh2-rtr-01, initialAmount: "15 
+IDR"
+```
+
+### 7. wRD2rRDIssuanceFlow
+Standard wRD to rRD conversion using owner string.
+```bash
+TODO
+```
+
+### 8. rRDIssuanceInitFlow (with walletId)
+Issue rRD from peritel to retail wallets.
+```bash
+TODO
+```
+
+### 9. rRDIssuanceFlow (legacy)
+Standard rRD issuance using owner string.
+```bash
+TODO
+```
+
+### 10. rRDTransferFlow
+Transfer rRD between retail users.
+```bash
+TODO
 ```
 
 ### 11. rRD2wRDRedemptionFlow (with walletId)
 Convert rRD back to wRD.
 ```bash
-flow start rRD2wRDRedemptionFlow amount: "1000000000 IDR", sourceWalletId: "rrd-wallet-id", targetWalletId: "wrd-wallet-id"
+TODO
 ```
 
 ### 12. rRDRedemptionFlow (legacy)
 Redeem rRD using owner string.
 ```bash
-flow start rRDRedemptionFlow amount: "500000000 IDR", retailOwner: "Wholesaler1-R-retail-001"
+TODO
 ```
 
 ## Vault Query Commands

@@ -83,6 +83,7 @@ public class MainController {
         return myMap;
     }
 
+    // TODO: Do something to this endpoint since only recorded when notary act as participant (tested)
     @GetMapping(value = "/notarized-transactions", produces = APPLICATION_JSON_VALUE)
     public ResponseEntity<List<Map<String, Object>>> getNotarizedTransactions() {
         try {
