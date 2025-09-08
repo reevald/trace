@@ -1,7 +1,7 @@
 package com.trace.flows;
 
 import co.paralleluniverse.fibers.Suspendable;
-import com.trace.contracts.wRDContract;
+import com.trace.contracts.RDContract;
 import com.trace.states.UtilAccountState;
 import com.trace.states.wRDAccountState;
 import net.corda.core.contracts.Amount;
@@ -29,6 +29,7 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
 
     private final UniqueIdentifier sourceWalletId;
     private final UniqueIdentifier receiverWalletId;
+    private final Party receiverWholesaler;
     private final Amount<Currency> amount;
 
     private final ProgressTracker.Step GENERATING_TRANSACTION = new ProgressTracker.Step("Generating transaction based on new wRD issuance.");
@@ -57,10 +58,11 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
             FINALISING_TRANSACTION
     );
 
-    public wRDIssuanceFlow(UniqueIdentifier sourceWalletId, UniqueIdentifier receiverWalletId,
+    public wRDIssuanceFlow(UniqueIdentifier sourceWalletId, UniqueIdentifier receiverWalletId, Party receiverWholesaler,
                            Amount<Currency> amount) {
         this.sourceWalletId = sourceWalletId;
         this.receiverWalletId = receiverWalletId;
+        this.receiverWholesaler = receiverWholesaler;
         this.amount = amount;
     }
 
@@ -96,10 +98,7 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         List<StateAndRef<wRDAccountState>> stateAndRefSourceWalletStates = new ArrayList<>();
         List<StateAndRef<wRDAccountState>> stateAndRefReceiverWalletStates = new ArrayList<>();
 
-        Party receiverParty = null;
-
         boolean isSourceWalletStateExistInKDR = false;
-        boolean isReceiverWalletStateExistInKDR = false;
         for (StateAndRef<wRDAccountState> stateAndRef : stateAndRefOfSourceAndReceiverWalletStatesInSourceParty) {
             if (stateAndRef.getState().getData().getWalletId().equals(sourceWalletId)) {
                 if (!stateAndRef.getState().getData().getOwner().equals(kdr)) {
@@ -109,25 +108,15 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
                 stateAndRefSourceWalletStates.add(stateAndRef);
             }
             if (stateAndRef.getState().getData().getWalletId().equals(receiverWalletId)) {
-                if (stateAndRef.getState().getData().getOwner().equals(kdr)) {
+                if (stateAndRef.getState().getData().getOwner().equals(receiverWholesaler)) {
                     throw new IllegalArgumentException("Receiver wallet state must be owned by non-kdr party.");
                 }
-                isReceiverWalletStateExistInKDR = true;
                 stateAndRefReceiverWalletStates.add(stateAndRef);
-                receiverParty = stateAndRef.getState().getData().getOwner();
             }
         }
 
         if (!isSourceWalletStateExistInKDR) {
             throw new IllegalArgumentException("Source wallet state must be exist in source party (KDR)");
-        }
-
-        // TODO: Adjust this conditional check if implement multi node KDR
-        // We simplified this logic by assume only one KDR node, which is who initialize every wholesaler wallet.
-        // Therefore, every wholesaler (receiver) wallet state must be already stored in KDR node.
-        if (!isReceiverWalletStateExistInKDR || receiverParty == null) {
-            // Consider KDR is node who issuance all wholesaler wallet states.
-            throw new FlowException("Receiver wallet state should be stored in source party (KDR)");
         }
 
         // 2. Gather source and receiver wallet states inside receiver party
@@ -136,7 +125,7 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         // inside the receiver party need to be retrieved, then we can compare which receiver wallet updated (based
         // on the highest version).
         // TODO: Adjust party to every KDR node if implement multi node for KDR
-        FlowSession session = initiateFlow(receiverParty);
+        FlowSession session = initiateFlow(receiverWholesaler);
         session.send(new UtilAccountState.StateSyncRequest(sourceWalletId, receiverWalletId));
         // This receive() method will BLOCK the flow until get the response.
         UtilAccountState.StateSyncResponse response = session.receive(UtilAccountState.StateSyncResponse.class).unwrap(data -> data);
@@ -169,15 +158,15 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         Amount<Currency> remainingBalanceResourceWallet =
                 stateAndRefSourceWalletStateDetermined.getState().getData().getTokenBalance().minus(amount);
         wRDAccountState outputSourceWalletState = stateAndRefSourceWalletStateDetermined.getState().getData()
-                .withNewBalanceAndIssuer(remainingBalanceResourceWallet, receiverParty);
+                .withNewBalanceAndIssuer(remainingBalanceResourceWallet, receiverWholesaler);
 
         Amount<Currency> remainingBalanceReceiverWallet =
                 stateAndRefReceiverWalletStateDetermined.getState().getData().getTokenBalance().plus(amount);
         wRDAccountState outputReceiverWalletState = stateAndRefReceiverWalletStateDetermined.getState().getData()
                 .withNewBalanceAndIssuer(remainingBalanceReceiverWallet, kdr);
 
-        txBuilder.addOutputState(outputSourceWalletState, wRDContract.ID);
-        txBuilder.addOutputState(outputReceiverWalletState, wRDContract.ID);
+        txBuilder.addOutputState(outputSourceWalletState, RDContract.ID);
+        txBuilder.addOutputState(outputReceiverWalletState, RDContract.ID);
 
         // 3.3 Add command related with wRDIssuanceFlow
         List<PublicKey> listOfRequiredSignersInSourceInputState =
@@ -193,7 +182,7 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         mergedListOfRequiredSigners.addAll(listOfRequiredSignersInSourceInputState);
         mergedListOfRequiredSigners.addAll(listOfRequiredSignersInReceiverOutputState);
 
-        txBuilder.addCommand(new wRDContract.Commands.wRDIssuanceCommand(), mergedListOfRequiredSigners);
+        txBuilder.addCommand(new RDContract.Commands.wRDIssuanceCommand(), mergedListOfRequiredSigners);
 
         // 4. Verify the transaction based on wRD Contract verify method (in current / source party)
         progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
@@ -211,7 +200,7 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         for (AbstractParty participant : stateAndRefSourceWalletStateDetermined.getState().getData().getParticipants()) {
             Party partyToInitiateFlow = (Party) participant;
             if (!partyToInitiateFlow.getOwningKey().equals(getOurIdentity().getOwningKey())
-                    && !partyToInitiateFlow.getOwningKey().equals(receiverParty.getOwningKey())) {
+                    && !partyToInitiateFlow.getOwningKey().equals(receiverWholesaler.getOwningKey())) {
                 FlowSession sessionOnlySign = initiateFlow(partyToInitiateFlow);
                 // Simple approach to bypass blocking receive syncStatRequest in responder flow
                 sessionOnlySign.send("SIGN_ONLY");
@@ -221,7 +210,7 @@ public class wRDIssuanceFlow extends FlowLogic<SignedTransaction> {
         for (AbstractParty participant : stateAndRefReceiverWalletStateDetermined.getState().getData().getParticipants()) {
             Party partyToInitiateFlow = (Party) participant;
             if (!partyToInitiateFlow.getOwningKey().equals(getOurIdentity().getOwningKey())
-                    && !partyToInitiateFlow.getOwningKey().equals(receiverParty.getOwningKey())) {
+                    && !partyToInitiateFlow.getOwningKey().equals(receiverWholesaler.getOwningKey())) {
                 FlowSession sessionOnlySign = initiateFlow(partyToInitiateFlow);
                 // Simple approach to bypass blocking receive syncStatRequest in responder flow
                 sessionOnlySign.send("SIGN_ONLY");
