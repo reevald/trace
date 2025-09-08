@@ -2,6 +2,7 @@ package com.trace.flows;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.trace.contracts.RDContract;
+import com.trace.states.rRDAccountState;
 import com.trace.states.wRDAccountState;
 import net.corda.core.contracts.Amount;
 import net.corda.core.contracts.StateAndRef;
@@ -20,17 +21,18 @@ import org.jetbrains.annotations.NotNull;
 
 import java.security.PublicKey;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Currency;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @InitiatingFlow
 @StartableByRPC
-public class wRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
+public class wRD2rRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
 
-    private final Party wholesaler;
-    private final Amount<Currency> amount;
-    private final UniqueIdentifier sourceWalletId;
+    private final UniqueIdentifier sourceWRDWalletId;
+    private final String ownerExternalId;
+    private final Amount<Currency> initialAmount;
 
     private final ProgressTracker.Step GENERATING_TRANSACTION = new ProgressTracker.Step("Generating transaction based on new wRD Issuance Init.");
     private final ProgressTracker.Step VERIFYING_TRANSACTION = new ProgressTracker.Step("Verifying contract constraints.");
@@ -58,10 +60,11 @@ public class wRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
             FINALISING_TRANSACTION
     );
 
-    public wRDIssuanceInitFlow(Party wholesaler, Amount<Currency> amount, UniqueIdentifier sourceWalletId) {
-        this.wholesaler = wholesaler;
-        this.amount = amount;
-        this.sourceWalletId = sourceWalletId;
+    public wRD2rRDIssuanceInitFlow(UniqueIdentifier sourceWRDWalletId, String ownerExternalId,
+                                   Amount<Currency> initialAmount) {
+        this.sourceWRDWalletId = sourceWRDWalletId;
+        this.ownerExternalId = ownerExternalId;
+        this.initialAmount = initialAmount;
     }
 
     @Override
@@ -78,53 +81,50 @@ public class wRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
         if (notary == null) {
             throw new IllegalArgumentException("Notary should be not null.");
         }
-        final Party kdr = getOurIdentity();
+        final Party wholesaler = getOurIdentity();
 
         // 2. Generating transaction blueprint
         progressTracker.setCurrentStep(GENERATING_TRANSACTION);
         // 2.1 Prepare input state
         QueryCriteria queryCriteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED);
-        List<java.util.UUID> walletIds = java.util.Collections.singletonList(sourceWalletId.getId());
+        List<java.util.UUID> walletIds = java.util.Collections.singletonList(sourceWRDWalletId.getId());
         QueryCriteria linearIdCriteria = new QueryCriteria.LinearStateQueryCriteria(null, walletIds);
         QueryCriteria combinedCriteria = queryCriteria.and(linearIdCriteria);
 
-        List<StateAndRef<wRDAccountState>> kdrStates = getServiceHub().getVaultService()
+        List<StateAndRef<wRDAccountState>> wholesalerStates = getServiceHub().getVaultService()
                 .queryBy(wRDAccountState.class, combinedCriteria).getStates()
                 .stream()
-                // The issuer not always KDR, for example once successful complete issuance to wholesaler A, the
-                // issuer will equal A.
-                .filter(stateAndRef -> stateAndRef.getState().getData().getOwner().equals(kdr))
+                .filter(stateAndRef -> stateAndRef.getState().getData().getOwner().equals(wholesaler))
                 .collect(Collectors.toList());
 
-        if (kdrStates.isEmpty()) {
-            throw new FlowException("No KDR account state found for walletId: " + sourceWalletId);
+        if (wholesalerStates.isEmpty()) {
+            throw new FlowException("No wholesaler account state found for walletId: " + sourceWRDWalletId);
         }
 
-        StateAndRef<wRDAccountState> inputStateAndRef = kdrStates.get(0);
+        StateAndRef<wRDAccountState> inputStateAndRef = wholesalerStates.get(0);
         wRDAccountState inputState = inputStateAndRef.getState().getData();
 
         // 2.2 Pre-verify amount token
-        if (inputState.getTokenBalance().getQuantity() < amount.getQuantity()) {
-            throw new FlowException("Insufficient balance in KDR account");
+        if (inputState.getTokenBalance().getQuantity() < initialAmount.getQuantity()) {
+            throw new FlowException("Insufficient balance in wholesaler account.");
         }
 
         // 2.3 Prepare output states
-        Amount<Currency> remainingBalance = inputState.getTokenBalance().minus(amount);
-        final wRDAccountState kdrOutputState = inputState.withNewBalanceAndIssuer(remainingBalance, wholesaler);
-        final wRDAccountState wholesalerOutputState = new wRDAccountState(wholesaler, kdr, "IDR", amount);
+        Amount<Currency> remainingBalance = inputState.getTokenBalance().minus(initialAmount);
+        final wRDAccountState wholesalerOutputWRDState = inputState.withNewBalance(remainingBalance);
+        final rRDAccountState retailerOutputRRDState = new rRDAccountState("RETAILER", ownerExternalId, wholesaler,
+                ownerExternalId, wholesaler, "IDR", initialAmount);
 
         progressTracker.setCurrentStep(GENERATING_TRANSACTION);
         List<PublicKey> listOfRequiredSigners = inputState.getParticipants()
                 .stream().map(AbstractParty::getOwningKey)
                 .collect(Collectors.toList());
 
-        listOfRequiredSigners.add(wholesaler.getOwningKey());
-
         final TransactionBuilder txBuilder = new TransactionBuilder(notary)
                 .addInputState(inputStateAndRef)
-                .addOutputState(kdrOutputState, RDContract.ID)
-                .addOutputState(wholesalerOutputState, RDContract.ID)
-                .addCommand(new RDContract.Commands.wRDIssuanceInitCommand(), listOfRequiredSigners);
+                .addOutputState(wholesalerOutputWRDState, RDContract.ID)
+                .addOutputState(retailerOutputRRDState, RDContract.ID)
+                .addCommand(new RDContract.Commands.wRD2rRDIssuanceInitCommand(), listOfRequiredSigners);
 
         // 3. Verify the transaction based on wRD Contract verify method (in current node)
         progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
@@ -137,14 +137,15 @@ public class wRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
         // 5. Collect all the required signatures from other nodes
         progressTracker.setCurrentStep(GATHERING_SIGS);
         List<FlowSession> sessions = new ArrayList<>();
-        for (AbstractParty participant: inputState.getParticipants()) {
+        for (AbstractParty participant : inputState.getParticipants()) {
             Party partyToInitiateFlow = (Party) participant;
             if (!partyToInitiateFlow.getOwningKey().equals(getOurIdentity().getOwningKey())) {
                 sessions.add(initiateFlow(partyToInitiateFlow));
             }
         }
-        sessions.add(initiateFlow(wholesaler));
-        SignedTransaction fullySignedTx = subFlow(new CollectSignaturesFlow(partSignedTx,
+
+        SignedTransaction fullySignedTx = (sessions.isEmpty()) ? partSignedTx :
+                subFlow(new CollectSignaturesFlow(partSignedTx,
                 sessions, GATHERING_SIGS.childProgressTracker()));
 
         // 6. Return the output of the FinalityFlow which sends the transaction to the notary for verification and
@@ -160,8 +161,8 @@ public class wRDIssuanceInitFlow extends FlowLogic<SignedTransaction> {
     }
 }
 
-@InitiatedBy(wRDIssuanceInitFlow.class)
-class wRDIssuanceInitFlowResponder extends FlowLogic<SignedTransaction> {
+@InitiatedBy(wRD2rRDIssuanceInitFlow.class)
+class wRD2rRDIssuanceInitFlowResponder extends FlowLogic<SignedTransaction> {
     private final FlowSession counterpartySession;
     private SecureHash txRespSignedId;
 
@@ -173,7 +174,7 @@ class wRDIssuanceInitFlowResponder extends FlowLogic<SignedTransaction> {
         }
     };
 
-    public wRDIssuanceInitFlowResponder(FlowSession counterpartySession) {
+    public wRD2rRDIssuanceInitFlowResponder(FlowSession counterpartySession) {
         this.counterpartySession = counterpartySession;
     }
 

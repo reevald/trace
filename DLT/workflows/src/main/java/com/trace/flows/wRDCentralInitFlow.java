@@ -2,7 +2,7 @@ package com.trace.flows;
 
 import co.paralleluniverse.fibers.Suspendable;
 import com.trace.states.wRDAccountState;
-import com.trace.contracts.wRDContract;
+import com.trace.contracts.RDContract;
 import net.corda.core.contracts.Amount;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.flows.*;
@@ -78,8 +78,8 @@ public class wRDCentralInitFlow extends FlowLogic<SignedTransaction> {
         final wRDAccountState outputState = new wRDAccountState(kdr, kdr, "IDR", initialAmount);
         final TransactionBuilder txBuilder;
         txBuilder = new TransactionBuilder(notary)
-                .addOutputState(outputState, wRDContract.ID)
-                .addCommand(new wRDContract.Commands.wRDCentralInitCommand(), Arrays.asList(kdr.getOwningKey()));
+                .addOutputState(outputState, RDContract.ID)
+                .addCommand(new RDContract.Commands.wRDCentralInitCommand(), Arrays.asList(kdr.getOwningKey()));
 
         // 3. Verify the transaction based on wRD Contract verify method (in current node)
         progressTracker.setCurrentStep(VERIFYING_TRANSACTION);

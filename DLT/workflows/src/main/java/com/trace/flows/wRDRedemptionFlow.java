@@ -1,7 +1,7 @@
 package com.trace.flows;
 
 import co.paralleluniverse.fibers.Suspendable;
-import com.trace.contracts.wRDContract;
+import com.trace.contracts.RDContract;
 import com.trace.states.UtilAccountState;
 import com.trace.states.wRDAccountState;
 import net.corda.core.contracts.Amount;
@@ -166,8 +166,8 @@ public class wRDRedemptionFlow extends FlowLogic<SignedTransaction> {
                 stateAndRefReceiverWalletStateDetermined.getState().getData()
                         .withNewBalanceAndIssuer(remainingBalanceReceiverWallet, sourceWholesaler);
 
-        txBuilder.addOutputState(outputSourceWalletState, wRDContract.ID);
-        txBuilder.addOutputState(outputReceiverWalletState, wRDContract.ID);
+        txBuilder.addOutputState(outputSourceWalletState, RDContract.ID);
+        txBuilder.addOutputState(outputReceiverWalletState, RDContract.ID);
 
         // 4.3 Add command related with wRDRedemptionFlow
         List<PublicKey> listOfRequiredSignersInSourceInputState =
@@ -183,7 +183,7 @@ public class wRDRedemptionFlow extends FlowLogic<SignedTransaction> {
         mergedListOfRequiredSigners.addAll(listOfRequiredSignersInSourceInputState);
         mergedListOfRequiredSigners.addAll(listOfRequiredSignersInReceiverInputState);
 
-        txBuilder.addCommand(new wRDContract.Commands.wRDRedemptionCommand(), mergedListOfRequiredSigners);
+        txBuilder.addCommand(new RDContract.Commands.wRDRedemptionCommand(), mergedListOfRequiredSigners);
 
         // 5. Verify the transaction based on wRD Contract verify method (in current / source party)
         progressTracker.setCurrentStep(VERIFYING_TRANSACTION);
