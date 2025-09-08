@@ -89,9 +89,9 @@ Standard wRD issuance with walletId specification.
 # Get walletId1 and walletId2
 run vaultQuery contractStateType: com.trace.states.wRDAccountState
 
-flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId1>, amount: "11 IDR"
+flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId1>, receiverWholesaler: "O=Wholesaler1,L=Jakarta,C=ID", amount: "11 IDR"
 
-flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId2>, amount: "4 IDR"
+flow start wRDIssuanceFlow sourceWalletId: <centralWalletId>, receiverWalletId: <walletId2>, receiverWholesaler: "O=Wholesaler2,L=Surabaya,C=ID", amount: "4 IDR"
 ```
 
 ### [✅] 4. wRDTransferFlow
@@ -112,10 +112,15 @@ flow start wRDRedemptionFlow sourceWalletId: <walletId1>, receiverWalletId: <kdr
 flow start wRDRedemptionFlow sourceWalletId: <walletId2>, receiverWalletId: <kdrWalletId>, amount: "10 IDR"
 ```
 
-### 6. wRD2rRDIssuanceInitFlow
+### [✅] 6. wRD2rRDIssuanceInitFlow
 Convert wRD to rRD for peritel operations.
 ```bash
-TODO
+# [Start from Wholesaler 1 or 2]
+flow start wRD2rRDIssuanceInitFlow sourceWRDWalletId: <wrdWalletId1>, ownerExternalId: wh1-rtr-01, initialAmount: "15 
+IDR"
+
+flow start wRD2rRDIssuanceInitFlow sourceWRDWalletId: <wrdWalletId2>, ownerExternalId: wh2-rtr-01, initialAmount: "15 
+IDR"
 ```
 
 ### 7. wRD2rRDIssuanceFlow
